@@ -16,8 +16,12 @@ import aiRoutes from './routes/ai.js';
 import uploadRoutes from './routes/upload.js';
 import subscriptionRoutes from './routes/subscriptions.js';
 import providerRoutes from './routes/providers.js';
+import promptRoutes from './routes/prompts.js';
 import faqRoutes from './routes/faq.js';
 import couponRoutes from './routes/coupons.js';
+import campaignRoutes from './routes/campaigns.js';
+import settingsRoutes from './routes/settings.js';
+import usersRoutes from './routes/users.js';
 
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFound } from './middleware/notFound.js';
@@ -27,8 +31,23 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
+// Global error handlers - MUST be at the top
+process.on('uncaughtException', (error) => {
+  console.error('💥 UNCAUGHT EXCEPTION:', error);
+  console.error('Stack:', error.stack);
+  // Don't exit, just log it
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 UNHANDLED REJECTION at:', promise);
+  console.error('Reason:', reason);
+});
+
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Trust proxy - CRITICAL for rate limiting behind nginx
+app.set('trust proxy', 1);
 
 app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true }));
@@ -53,6 +72,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+
 app.use('/api/auth', authRoutes);
 app.use('/api/resumes', resumeRoutes);
 app.use('/api/resume-data', resumeDataRoutes);
@@ -60,9 +80,13 @@ app.use('/api/versions', versionRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/prompts', promptRoutes);
 app.use('/api/providers', providerRoutes);
 app.use('/api/faq', faqRoutes);
 app.use('/api/coupons', couponRoutes);
+app.use('/api/campaigns', campaignRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/users', usersRoutes);
 
 app.use('/uploads', express.static(process.env.UPLOAD_DIR || path.join(__dirname, '../../uploads')));
 

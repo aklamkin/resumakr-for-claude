@@ -42,6 +42,10 @@ const Toast = React.forwardRef(({ className, variant, ...props }, ref) => {
     <div
       ref={ref}
       className={cn(toastVariants({ variant }), className)}
+      tabIndex={-1}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
       {...props}
     />
   );

@@ -118,6 +118,25 @@ export const api = {
       async list() {
         const { data } = await client.get('/subscriptions/plans');
         return data;
+      },
+      async filter(filters, sortBy = 'price') {
+        const { data } = await client.get('/subscriptions/plans', { params: { ...filters, sort: sortBy } });
+        return data;
+      },
+      async get(id) {
+        const { data } = await client.get(`/subscriptions/plans/${id}`);
+        return data;
+      },
+      async create(planData) {
+        const { data } = await client.post('/subscriptions/plans', planData);
+        return data;
+      },
+      async update(id, updates) {
+        const { data } = await client.put(`/subscriptions/plans/${id}`, updates);
+        return data;
+      },
+      async delete(id) {
+        await client.delete(`/subscriptions/plans/${id}`);
       }
     },
     AIProvider: {
@@ -141,10 +160,75 @@ export const api = {
         await client.delete(`/providers/${id}`);
       }
     },
+    CustomPrompt: {
+      async list() {
+        const { data } = await client.get('/prompts');
+        return data;
+      },
+      async filter(filters) {
+        const { data } = await client.get('/prompts', { params: filters });
+        return data;
+      },
+      async create(promptData) {
+        const { data } = await client.post('/prompts', promptData);
+        return data;
+      },
+      async update(id, updates) {
+        const { data } = await client.put(`/prompts/${id}`, updates);
+        return data;
+      },
+      async delete(id) {
+        await client.delete(`/prompts/${id}`);
+      }
+    },
     CouponCode: {
+      async list() {
+        const { data } = await client.get('/coupons');
+        return data;
+      },
       async filter(filters) {
         const { data } = await client.get('/coupons', { params: filters });
         return data;
+      },
+      async get(id) {
+        const { data } = await client.get(`/coupons/${id}`);
+        return data;
+      },
+      async create(couponData) {
+        const { data } = await client.post('/coupons', couponData);
+        return data;
+      },
+      async update(id, updates) {
+        const { data } = await client.put(`/coupons/${id}`, updates);
+        return data;
+      },
+      async delete(id) {
+        await client.delete(`/coupons/${id}`);
+      }
+    },
+    MarketingCampaign: {
+      async list() {
+        const { data } = await client.get('/campaigns');
+        return data;
+      },
+      async filter(filters) {
+        const { data } = await client.get('/campaigns', { params: filters });
+        return data;
+      },
+      async get(id) {
+        const { data } = await client.get(`/campaigns/${id}`);
+        return data;
+      },
+      async create(campaignData) {
+        const { data } = await client.post('/campaigns', campaignData);
+        return data;
+      },
+      async update(id, updates) {
+        const { data } = await client.put(`/campaigns/${id}`, updates);
+        return data;
+      },
+      async delete(id) {
+        await client.delete(`/campaigns/${id}`);
       }
     },
     FAQItem: {
@@ -158,6 +242,41 @@ export const api = {
       }
     },
     HelpConfig: {
+    AppSettings: {
+      async list() {
+        const { data } = await client.get('/settings');
+        return data;
+      },
+      async get(key) {
+        const { data } = await client.get(`/settings/${key}`);
+        return data;
+      },
+      async update(key, updates) {
+        const { data } = await client.put(`/settings/${key}`, updates);
+        return data;
+      }
+    },
+    Users: {
+      async list(params) {
+        const { data } = await client.get('/users', { params });
+        return data;
+      },
+      async get(id) {
+        const { data } = await client.get(`/users/${id}`);
+        return data;
+      },
+      async create(userData) {
+        const { data } = await client.post('/users', userData);
+        return data;
+      },
+      async update(id, updates) {
+        const { data } = await client.put(`/users/${id}`, updates);
+        return data;
+      },
+      async delete(id) {
+        await client.delete(`/users/${id}`);
+      }
+    },
       async list() {
         const { data } = await client.get('/faq/config');
         return [data];

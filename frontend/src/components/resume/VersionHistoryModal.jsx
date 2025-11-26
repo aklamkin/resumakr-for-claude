@@ -155,7 +155,7 @@ export default function VersionHistoryModal({
           <div className="space-y-4 mt-4">
             {versions.length === 0 ? (
               <div className="text-center py-12 text-slate-500 dark:text-slate-400">
-                <Calendar className="w-12 h-12 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+                <Calendar className="w-12 h-12 mx-auto mb-3 text-slate-300 dark:text-slate-400" />
                 <p>No versions saved yet</p>
               </div>
             ) : (

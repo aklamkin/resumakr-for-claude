@@ -2,16 +2,49 @@ import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, AlertCircle, X, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import api from "../../api/apiClient";
 
 export function NotificationPopup({ open, onClose, title, message, type = "success" }) {
+  const [settings, setSettings] = React.useState({
+    enabled: true,
+    duration: 4000
+  });
+
   React.useEffect(() => {
-    if (open) {
+    const loadSettings = async () => {
+      try {
+        const cachedSettings = localStorage.getItem('app_notification_settings');
+        if (cachedSettings) {
+          setSettings(JSON.parse(cachedSettings));
+        } else {
+          const appSettings = await api.entities.AppSettings.list();
+          const enabledSetting = appSettings.find(s => s.setting_key === 'notifications_enabled');
+          const durationSetting = appSettings.find(s => s.setting_key === 'notification_duration');
+          
+          const newSettings = {
+            enabled: enabledSetting ? enabledSetting.setting_value === 'true' : true,
+            duration: parseInt(durationSetting?.setting_value || '4000')
+          };
+          setSettings(newSettings);
+          localStorage.setItem('app_notification_settings', JSON.stringify(newSettings));
+        }
+      } catch (error) {
+        console.error('Failed to load notification settings:', error);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  React.useEffect(() => {
+    if (open && settings.enabled) {
       const timer = setTimeout(() => {
         onClose();
-      }, 4000);
+      }, settings.duration);
       return () => clearTimeout(timer);
+    } else if (open && !settings.enabled) {
+      onClose();
     }
-  }, [open, onClose]);
+  }, [open, onClose, settings]);
 
   const getIcon = () => {
     switch (type) {
@@ -52,20 +85,25 @@ export function NotificationPopup({ open, onClose, title, message, type = "succe
     }
   };
 
+  if (!settings.enabled) {
+    return null;
+  }
+
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[200] flex items-start justify-center pt-20 pointer-events-none">
+        <div className="fixed inset-0 z-[200] flex items-start justify-center pt-20 pointer-events-none" role="status" aria-live="polite" aria-atomic="true">
           <motion.div
             initial={{ opacity: 0, y: -50, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -50, scale: 0.95 }}
             className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border-2 border-slate-200 dark:border-slate-700 max-w-md mx-4 pointer-events-auto overflow-hidden"
+            tabIndex={-1}
           >
-            <div className={`h-1 ${getBarColor()}`} />
+            <div className={'h-1 ' + getBarColor()} />
             <div className="p-6">
               <div className="flex items-start gap-4">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${getIconBgColor()}`}>
+                <div className={'w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ' + getIconBgColor()}>
                   {getIcon()}
                 </div>
                 <div className="flex-1 min-w-0">
