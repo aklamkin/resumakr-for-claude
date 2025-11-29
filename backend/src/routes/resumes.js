@@ -45,7 +45,7 @@ router.post('/', async (req, res) => {
     if (!title || !source_type) {
       return res.status(400).json({ error: 'Title and source_type are required' });
     }
-    const result = await query('INSERT INTO resumes (title, status, source_type, file_url, last_edited_step, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *', [title, status, source_type, file_url, last_edited_step, req.user.id]);
+    const result = await query('INSERT INTO resumes (user_id, title, status, source_type, file_url, last_edited_step, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *', [req.user.id, title, status, source_type, file_url, last_edited_step, req.user.id]);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Create resume error:', error);

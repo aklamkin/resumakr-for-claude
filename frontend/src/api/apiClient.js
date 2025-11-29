@@ -242,6 +242,11 @@ export const api = {
       }
     },
     HelpConfig: {
+      async list() {
+        const { data } = await client.get('/faq/config');
+        return [data];
+      }
+    },
     AppSettings: {
       async list() {
         const { data } = await client.get('/settings');
@@ -275,11 +280,6 @@ export const api = {
       },
       async delete(id) {
         await client.delete(`/users/${id}`);
-      }
-    },
-      async list() {
-        const { data } = await client.get('/faq/config');
-        return [data];
       }
     }
   },

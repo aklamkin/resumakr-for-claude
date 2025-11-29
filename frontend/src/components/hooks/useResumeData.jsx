@@ -15,19 +15,29 @@ export function useResumeData(resumeId) {
     }
 
     try {
-      const resumeList = await api.entities.Resume.filter({ id: resumeId });
-      const dataList = await api.entities.ResumeData.filter({ resume_id: resumeId });
+      // Fetch resume by ID
+      const fetchedResume = await api.entities.Resume.get(resumeId);
 
-      if (resumeList.length === 0) {
+      if (!fetchedResume) {
         setError("Resume not found");
-      } else {
-        setResume(resumeList[0]);
-        const data = dataList[0] || {};
-        setResumeData(data);
+        setLoading(false);
+        return;
+      }
+
+      setResume(fetchedResume);
+
+      // Fetch resume data using the correct method
+      try {
+        const fetchedData = await api.entities.ResumeData.getByResumeId(resumeId);
+        setResumeData(fetchedData || {});
+      } catch (dataErr) {
+        // If no resume data exists yet, that's okay - initialize with empty object
+        console.log("No resume data found, initializing with empty object");
+        setResumeData({});
       }
     } catch (err) {
       setError("Failed to load resume");
-      console.error(err);
+      console.error("Error loading resume:", err);
     } finally {
       setLoading(false);
     }
@@ -39,7 +49,7 @@ export function useResumeData(resumeId) {
 
   const updateResumeData = async (updates) => {
     if (!resumeData?.id) return;
-    
+
     try {
       await api.entities.ResumeData.update(resumeData.id, updates);
       setResumeData(prev => ({ ...prev, ...updates }));
@@ -52,7 +62,7 @@ export function useResumeData(resumeId) {
 
   const updateResumeTitle = async (newTitle) => {
     if (!resume?.id || !newTitle.trim()) return false;
-    
+
     try {
       await api.entities.Resume.update(resume.id, { title: newTitle.trim() });
       setResume(prev => ({ ...prev, title: newTitle.trim() }));

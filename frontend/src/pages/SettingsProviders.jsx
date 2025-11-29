@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Brain, Plus, Trash2, CheckCircle, Eye, EyeOff, AlertCircle, Loader2, Edit2 } from "lucide-react";
-import { NotificationPopup } from "../components/ui/notification";
+import { Brain, Plus, Trash2, CheckCircle, AlertCircle, Loader2, Edit2, Power, X } from "lucide-react";
+import { NotificationPopup, ConfirmDialog } from "../components/ui/notification";
 import { motion } from "framer-motion";
 
 const PROVIDER_PRESETS = {
@@ -66,12 +66,13 @@ const PROVIDER_PRESETS = {
 
 export default function SettingsProviders() {
   const queryClient = useQueryClient();
-  const [showKeys, setShowKeys] = useState({});
   const [notification, setNotification] = useState({ open: false, title: "", message: "", type: "success" });
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editingProvider, setEditingProvider] = useState(null);
+  const [editingProviderId, setEditingProviderId] = useState(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState({ open: false, providerId: null, providerName: "" });
+  const [editData, setEditData] = useState({});
 
   React.useEffect(() => {
     api.auth.me().then(currentUser => {
@@ -85,23 +86,9 @@ export default function SettingsProviders() {
   const showNotification = (message, title = "", type = "success") => {
     setNotification({ open: true, title, message, type });
   };
-
   const { data: providers = [], isLoading: loadingProviders } = useQuery({
     queryKey: ["ai-providers"],
-    queryFn: async () => {
-      const currentUser = await api.auth.me();
-      return api.entities.AIProvider.filter({ created_by: currentUser.email }, "order");
-    },
-    enabled: !loading,
-  });
-
-  const { data: prompts = [] } = useQuery({
-    queryKey: ["custom-prompts"],
-    queryFn: async () => {
-      const currentUser = await api.auth.me();
-      return api.entities.CustomPrompt.filter({ created_by: currentUser.email });
-    },
-    enabled: !loading,
+    queryFn: () => api.entities.AIProvider.list()
   });
 
   const createProviderMutation = useMutation({
@@ -120,6 +107,8 @@ export default function SettingsProviders() {
     mutationFn: ({ id, data }) => api.entities.AIProvider.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ai-providers"] });
+      setEditingProviderId(null);
+      setEditData({});
       showNotification("Provider updated successfully!", "Success");
     },
     onError: (error) => {
@@ -143,7 +132,6 @@ export default function SettingsProviders() {
     name: PROVIDER_PRESETS.openai.name,
     api_url: PROVIDER_PRESETS.openai.api_url,
     api_key: "",
-    custom_prompt_id: "",
     is_default: false,
     order: 0
   });
@@ -169,24 +157,49 @@ export default function SettingsProviders() {
       name: PROVIDER_PRESETS.openai.name,
       api_url: PROVIDER_PRESETS.openai.api_url,
       api_key: "",
-      custom_prompt_id: "",
       is_default: false,
       order: providers.length + 1
     });
-    setEditingProvider(null);
     setShowForm(false);
   };
 
   const handleEdit = (provider) => {
-    setEditingProvider(provider);
-    setNewProvider({
+    setEditingProviderId(provider.id);
+    setEditData({
       provider_type: provider.provider_type || "openai",
       name: provider.name || "",
       api_url: provider.api_url || "",
-      api_key: provider.api_key || "",
-      custom_prompt_id: provider.custom_prompt_id || "",
+      api_key: "", // Leave empty, will only update if user enters new value
       is_default: provider.is_default || false,
       order: provider.order || 0
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingProviderId(null);
+    setEditData({});
+  };
+
+  const handleSaveEdit = (provider) => {
+    if (!editData.name?.trim()) {
+      showNotification("Please fill in provider name.", "Missing Information", "error");
+      return;
+    }
+
+    // Only include api_key if it was changed (not empty)
+    const updateData = {
+      ...editData,
+      created_by: user.email
+    };
+
+    // If api_key is empty, remove it from the update (keep existing key)
+    if (!updateData.api_key?.trim()) {
+      delete updateData.api_key;
+    }
+
+    updateProviderMutation.mutate({
+      id: provider.id,
+      data: updateData
     });
   };
 
@@ -196,14 +209,7 @@ export default function SettingsProviders() {
       return;
     }
 
-    if (editingProvider) {
-      updateProviderMutation.mutate({ 
-        id: editingProvider.id, 
-        data: { ...newProvider, order: editingProvider.order, created_by: user.email } 
-      });
-    } else {
-      createProviderMutation.mutate({ ...newProvider, order: providers.length + 1, created_by: user.email });
-    }
+    createProviderMutation.mutate({ ...newProvider, order: providers.length + 1, created_by: user.email });
   };
 
   const handleSetDefault = async (providerId) => {
@@ -226,19 +232,19 @@ export default function SettingsProviders() {
     }
   };
 
-  const handleAssignPrompt = (providerId, promptId) => {
-    const provider = providers.find(p => p.id === providerId);
-    if (!provider) return;
-    updateProviderMutation.mutate({
-      id: providerId,
-      data: { ...provider, custom_prompt_id: promptId || null }
+  const handleDeleteClick = (provider) => {
+    setDeleteConfirmation({
+      open: true,
+      providerId: provider.id,
+      providerName: provider.name
     });
   };
 
-  const getPromptName = (promptId) => {
-    if (!promptId) return "Default Prompt";
-    const prompt = prompts.find(p => p.id === promptId);
-    return prompt?.name || "Unknown Prompt";
+  const confirmDelete = () => {
+    if (deleteConfirmation.providerId) {
+      deleteProviderMutation.mutate(deleteConfirmation.providerId);
+      setDeleteConfirmation({ open: false, providerId: null, providerName: "" });
+    }
   };
 
   const defaultProviders = providers.filter(p => p.is_default).slice(0, 3);
@@ -322,7 +328,7 @@ export default function SettingsProviders() {
             >
               <Card className="p-6 border-2 border-indigo-200 dark:border-indigo-700 bg-white dark:bg-slate-800">
                 <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-6">
-                  {editingProvider ? "Edit Provider" : "Add New AI Provider"}
+                  Add New AI Provider
                 </h3>
 
                 <div className="space-y-4">
@@ -374,30 +380,12 @@ export default function SettingsProviders() {
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-slate-900 dark:text-slate-200">Assigned Prompt (Optional)</Label>
-                    <Select
-                      value={newProvider.custom_prompt_id || "default"}
-                      onValueChange={(value) => setNewProvider({...newProvider, custom_prompt_id: value === "default" ? "" : value})}
-                    >
-                      <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
-                        <SelectValue placeholder="Use default prompt" />
-                      </SelectTrigger>
-                      <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700">
-                        <SelectItem value="default" className="dark:hover:bg-slate-700">Use Default Prompt</SelectItem>
-                        {prompts.map((prompt) => (
-                          <SelectItem key={prompt.id} value={prompt.id} className="dark:hover:bg-slate-700">{prompt.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
                   <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
                     <Button variant="outline" onClick={resetForm} className="border-slate-300 dark:border-slate-600">
                       Cancel
                     </Button>
                     <Button onClick={handleAddProvider} className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600">
-                      {editingProvider ? "Update" : "Add"} Provider
+                      Add Provider
                     </Button>
                   </div>
                 </div>
@@ -426,79 +414,152 @@ export default function SettingsProviders() {
                 <div className="divide-y divide-slate-200 dark:divide-slate-700">
                   {providers.map((provider) => (
                     <div key={provider.id} className="p-6 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-indigo-700 dark:from-indigo-500 dark:to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <Brain className="w-6 h-6 text-white" />
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{provider.name}</h4>
-                            {provider.is_default && (
-                              <Badge className="bg-indigo-600 text-white dark:bg-indigo-500">Default</Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{provider.api_url}</p>
-                          <div className="flex items-center gap-2 mb-3">
-                            <p className="text-sm text-slate-500 dark:text-slate-400">
-                              API Key: {showKeys[provider.id] ? provider.api_key : '••••••••••••••••'}
-                            </p>
-                            <button
-                              onClick={() => setShowKeys({...showKeys, [provider.id]: !showKeys[provider.id]})}
-                              className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                      {editingProviderId === provider.id ? (
+                        // EDIT MODE - Inline editing form
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Edit Provider</h3>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleCancelEdit}
+                              className="text-slate-600 dark:text-slate-400"
                             >
-                              {showKeys[provider.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
+                              <X className="w-4 h-4" />
+                            </Button>
                           </div>
 
                           <div className="space-y-2">
-                            <Label className="text-xs text-slate-900 dark:text-slate-200">Assigned Prompt</Label>
+                            <Label className="text-slate-900 dark:text-slate-200">Provider Type</Label>
                             <Select
-                              value={provider.custom_prompt_id || "default"}
-                              onValueChange={(value) => handleAssignPrompt(provider.id, value === "default" ? null : value)}
+                              value={editData.provider_type}
+                              onValueChange={(type) => {
+                                const preset = PROVIDER_PRESETS[type];
+                                setEditData({
+                                  ...editData,
+                                  provider_type: type,
+                                  name: preset?.name || editData.name,
+                                  api_url: preset?.api_url || editData.api_url,
+                                });
+                              }}
                             >
-                              <SelectTrigger className="w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
-                                <SelectValue>{getPromptName(provider.custom_prompt_id)}</SelectValue>
+                              <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
+                                <SelectValue />
                               </SelectTrigger>
                               <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700">
-                                <SelectItem value="default" className="dark:hover:bg-slate-700">Use Default Prompt</SelectItem>
-                                {prompts.map((prompt) => (
-                                  <SelectItem key={prompt.id} value={prompt.id} className="dark:hover:bg-slate-700">{prompt.name}</SelectItem>
+                                {Object.entries(PROVIDER_PRESETS).map(([key, preset]) => (
+                                  <SelectItem key={key} value={key} className="dark:hover:bg-slate-700">{preset.name}</SelectItem>
                                 ))}
+                                <SelectItem value="custom" className="dark:hover:bg-slate-700">Custom Provider</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
-                        </div>
 
-                        <div className="flex gap-2 flex-shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSetDefault(provider.id)}
-                            disabled={!provider.is_default && defaultProviders.length >= 3}
-                            className="text-slate-600 dark:text-slate-400"
-                            title={provider.is_default ? "Remove as default" : "Set as default"}
-                          >
-                            <CheckCircle className={`w-4 h-4 ${provider.is_default ? 'fill-current' : ''}`} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(provider)}
-                            className="text-indigo-600 dark:text-indigo-400"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteProviderMutation.mutate(provider.id)}
-                            className="text-red-600 dark:text-red-400"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-slate-900 dark:text-slate-200">Provider Name</Label>
+                              <Input
+                                value={editData.name}
+                                onChange={(e) => setEditData({...editData, name: e.target.value})}
+                                placeholder="My AI Provider"
+                                className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label className="text-slate-900 dark:text-slate-200">API URL</Label>
+                              <Input
+                                value={editData.api_url}
+                                onChange={(e) => setEditData({...editData, api_url: e.target.value})}
+                                placeholder="https://api.example.com/v1/..."
+                                className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-slate-900 dark:text-slate-200">API Key (optional - leave empty to keep existing)</Label>
+                            <Input
+                              type="password"
+                              value={editData.api_key}
+                              onChange={(e) => setEditData({...editData, api_key: e.target.value})}
+                              placeholder="•••••••••••••• (existing key will be kept if empty)"
+                              className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700"
+                            />
+                          </div>
+
+                          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                            <Button
+                              variant="outline"
+                              onClick={handleCancelEdit}
+                              className="border-slate-300 dark:border-slate-600"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={() => handleSaveEdit(provider)}
+                              className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                              disabled={updateProviderMutation.isPending}
+                            >
+                              {updateProviderMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                              Update Provider
+                            </Button>
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        // VIEW MODE - Normal card display
+                        <div className="flex items-start gap-4">
+                          <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-indigo-700 dark:from-indigo-500 dark:to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <Brain className="w-6 h-6 text-white" />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{provider.name}</h4>
+                              {provider.is_default && (
+                                <Badge className="bg-green-600 text-white dark:bg-green-500">Default</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{provider.api_url}</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                              API Key: ••••••••••••••••
+                            </p>
+                          </div>
+
+                          <div className="flex gap-2 flex-shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => updateProviderMutation.mutate({
+                                id: provider.id,
+                                data: { ...provider, is_active: !provider.is_active }
+                              })}
+                              className={`${provider.is_active ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}`}
+                              title={provider.is_active ? 'Deactivate' : 'Activate'}
+                            >
+                              <Power className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(provider)}
+                              className="text-indigo-600 dark:text-indigo-400"
+                              title="Edit provider"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteClick(provider)}
+                              className="text-red-600 dark:text-red-400"
+                              title="Delete provider"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -514,6 +575,17 @@ export default function SettingsProviders() {
         title={notification.title}
         message={notification.message}
         type={notification.type}
+      />
+
+      <ConfirmDialog
+        open={deleteConfirmation.open}
+        onClose={() => setDeleteConfirmation({ open: false, providerId: null, providerName: "" })}
+        onConfirm={confirmDelete}
+        title="Delete AI Provider"
+        message={`Are you sure you want to delete "${deleteConfirmation.providerName}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
       />
     </div>
   );

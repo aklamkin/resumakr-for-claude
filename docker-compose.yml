@@ -34,7 +34,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       FILE_STORAGE: local
       UPLOAD_DIR: /app/uploads
-      FRONTEND_URL: http://localhost:5173
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       BCRYPT_ROUNDS: 10
     volumes:
       - uploads:/app/uploads
@@ -45,7 +45,7 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: http://localhost:3001/api
+        VITE_API_URL: /api
     container_name: resumakr-frontend
     restart: unless-stopped
     depends_on:

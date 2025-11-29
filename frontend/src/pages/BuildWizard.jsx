@@ -85,10 +85,16 @@ export default function BuildWizard() {
       if (existingDrafts.length > 0) {
         const draft = existingDrafts[0];
         setResumeId(draft.id);
-        
-        const existingData = await api.entities.ResumeData.filter({ resume_id: draft.id });
-        if (existingData.length > 0) {
-          setResumeData(existingData[0]);
+
+        // Try to get existing resume data
+        try {
+          const existingData = await api.entities.ResumeData.getByResumeId(draft.id);
+          if (existingData) {
+            setResumeData(existingData);
+          }
+        } catch (error) {
+          // No existing data yet, that's okay - user will fill it in
+          console.log("No existing resume data found, starting fresh");
         }
       } else {
         const newResume = await api.entities.Resume.create({
@@ -110,15 +116,31 @@ export default function BuildWizard() {
   };
 
   const saveProgress = async () => {
-    if (!resumeId) return;
+    if (!resumeId) {
+      console.error("Cannot save progress: resumeId is missing");
+      throw new Error("Resume ID is missing. Please refresh the page and try again.");
+    }
+
+    console.log("Saving progress - resumeId:", resumeId);
+    console.log("Resume data being saved:", JSON.stringify(resumeData, null, 2));
 
     setSaving(true);
     try {
-      const existingData = await api.entities.ResumeData.filter({ resume_id: resumeId });
-      
-      if (existingData.length > 0) {
-        await api.entities.ResumeData.update(existingData[0].id, resumeData);
+      // Try to get existing resume data
+      let existingData = null;
+      try {
+        existingData = await api.entities.ResumeData.getByResumeId(resumeId);
+        console.log("Existing resume data:", existingData);
+      } catch (error) {
+        // No existing data, will create new
+        console.log("No existing resume data found, will create new");
+      }
+
+      if (existingData && existingData.id) {
+        console.log("Updating existing resume data with ID:", existingData.id);
+        await api.entities.ResumeData.update(existingData.id, resumeData);
       } else {
+        console.log("Creating new resume data");
         await api.entities.ResumeData.create({
           resume_id: resumeId,
           ...resumeData
@@ -128,29 +150,72 @@ export default function BuildWizard() {
       await api.entities.Resume.update(resumeId, {
         last_edited_step: steps[currentStep].id
       });
+
+      console.log("Progress saved successfully");
     } catch (error) {
       console.error("Error saving progress:", error);
+      console.error("Error details:", error.response?.data || error.message);
+      throw error; // Re-throw so handleNext can catch it
     } finally {
       setSaving(false);
     }
   };
 
   const handleNext = async () => {
-    await saveProgress();
-    
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      // Final step - create version and navigate to review
-      await api.entities.ResumeVersion.create({
-        resume_id: resumeId,
-        version_number: 1,
-        data_snapshot: resumeData,
-        version_name: "Initial creation",
-        notes: ""
-      });
-      
-      navigate(createPageUrl(`ResumeReview?id=${resumeId}`));
+    try {
+      console.log("handleNext called - currentStep:", currentStep, "resumeId:", resumeId);
+      console.log("Current resume data:", JSON.stringify(resumeData, null, 2));
+
+      await saveProgress();
+      console.log("Progress saved successfully");
+
+      if (currentStep < steps.length - 1) {
+        setCurrentStep(currentStep + 1);
+        console.log("Moving to next step:", currentStep + 1);
+      } else {
+        // Final step - create version and navigate to review
+        console.log("Final step - creating resume version");
+
+        if (!resumeId) {
+          throw new Error("Resume ID is missing. Please refresh the page and try again.");
+        }
+
+        if (!resumeData || Object.keys(resumeData).length === 0) {
+          throw new Error("Resume data is empty. Please add some information before completing.");
+        }
+
+        setSaving(true);
+
+        console.log("Creating version with data:", {
+          resume_id: resumeId,
+          data_snapshot: resumeData,
+          version_name: "Initial creation",
+          notes: ""
+        });
+
+        const version = await api.entities.ResumeVersion.create({
+          resume_id: resumeId,
+          data_snapshot: resumeData,
+          version_name: "Initial creation",
+          notes: ""
+        });
+
+        console.log("Resume version created:", version);
+        setSaving(false);
+
+        const reviewUrl = createPageUrl(`ResumeReview?id=${resumeId}`);
+        console.log("Navigating to:", reviewUrl);
+        navigate(reviewUrl);
+      }
+    } catch (error) {
+      console.error("Error in handleNext:", error);
+      console.error("Error response:", error.response?.data);
+      console.error("Error status:", error.response?.status);
+      setSaving(false);
+
+      // Show more detailed error message
+      const errorMessage = error.response?.data?.error || error.message || "Failed to complete the step. Please try again.";
+      alert(`Error: ${errorMessage}\n\nCheck the browser console for more details.`);
     }
   };
 

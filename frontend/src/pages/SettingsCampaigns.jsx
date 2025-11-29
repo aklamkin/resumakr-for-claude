@@ -41,6 +41,8 @@ export default function SettingsCampaigns() {
     queryKey: ['marketing-campaigns'],
     queryFn: () => api.entities.MarketingCampaign.list('-created_date'),
     enabled: !loading,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const { data: plans = [] } = useQuery({
@@ -114,8 +116,12 @@ export default function SettingsCampaigns() {
       }
       return api.entities.MarketingCampaign.update(campaign.id, { is_active: newState });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['marketing-campaigns'] });
+    onSuccess: (updatedCampaign) => {
+      // Manually update cache instead of refetching to prevent list jumping
+      queryClient.setQueryData(['marketing-campaigns'], (oldData) => {
+        if (!oldData) return oldData;
+        return oldData.map(c => c.id === updatedCampaign.id ? updatedCampaign : c);
+      });
       showNotification("Campaign status updated!", "Success");
     },
     onError: (error) => {

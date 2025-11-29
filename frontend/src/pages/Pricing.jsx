@@ -71,13 +71,14 @@ export default function Pricing() {
     queryKey: ["current-user"],
     queryFn: () => api.auth.me(),
     retry: false,
+    enabled: !!localStorage.getItem('resumakr_token'),
     staleTime: 0
   });
 
   const { data: plans = FALLBACK_PLANS, isLoading: loadingPlans } = useQuery({
     queryKey: ["subscription-plans-active"],
     queryFn: async () => {
-      const fetchedPlans = await api.entities.SubscriptionPlan.filter({ is_active: true }, "order");
+      const fetchedPlans = await api.entities.SubscriptionPlan.list();
       return fetchedPlans.length > 0 ? fetchedPlans : FALLBACK_PLANS;
     },
     staleTime: 0
@@ -188,52 +189,36 @@ export default function Pricing() {
   };
 
   const handleActivateSubscription = async () => {
+    // Check if user is logged in
+    if (!currentUser) {
+      navigate('/login?returnUrl=Pricing');
+      return;
+    }
+    
     setActivating(true);
     try {
-      if (appliedCoupon) {
-        await api.functions.invoke('applyCoupon', {
-          coupon_code: appliedCoupon.code
-        });
-      }
-
-      const { startDate, endDate } = calculateSubscriptionDates(selectedPlan);
-      const prices = calculateFinalPrice(selectedPlan);
-
-      const signupSnapshot = {
-        signup_date: new Date().toISOString(),
-        original_price: parseFloat(prices.original),
-        final_price_paid: parseFloat(prices.final)
-      };
-
-      if (appliedCoupon) {
-        signupSnapshot.coupon_used = {
-          code: appliedCoupon.code,
-          discount_type: appliedCoupon.discount_type,
-          discount_value: appliedCoupon.discount_value,
-          description: appliedCoupon.description
-        };
-      }
-
-      if (activeCampaign && activeCampaign.target_plan === selectedPlan) {
-        signupSnapshot.campaign_active = {
-          name: activeCampaign.campaign_name,
-          type: activeCampaign.campaign_type,
-          free_trial_days: activeCampaign.free_trial_duration,
-          discount_percentage: activeCampaign.discount_percentage,
-          discount_amount: activeCampaign.discount_amount
-        };
-      }
-
-      await api.auth.updateMe({
-        is_subscribed: true,
-        subscription_plan: selectedPlan,
-        subscription_start_date: startDate.toISOString(),
-        subscription_end_date: endDate.toISOString(),
-        campaign_id: activeCampaign?.id || null,
-        coupon_code: appliedCoupon?.code || null,
-        signup_offer_snapshot: signupSnapshot
+      // Call the backend subscription activation endpoint
+      const response = await fetch('/api/subscriptions/activate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('resumakr_token')}`
+        },
+        body: JSON.stringify({
+          plan_id: selectedPlan
+        })
       });
 
+      if (!response.ok) {
+        throw new Error('Subscription activation failed');
+      }
+
+      const data = await response.json();
+      
+      // Refresh user data
+      await queryClient.invalidateQueries(['current-user']);
+      
+      // Redirect to return URL
       setTimeout(() => {
         navigate(createPageUrl(returnUrl));
       }, 500);
@@ -244,7 +229,6 @@ export default function Pricing() {
       setActivating(false);
     }
   };
-
   const getAllFeatures = () => {
     const allFeatures = new Set();
     plans.forEach(plan => {

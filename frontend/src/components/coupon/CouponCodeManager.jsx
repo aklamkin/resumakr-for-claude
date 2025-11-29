@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Edit2, Ticket, ArrowUpDown, Loader2 } from "lucide-react";
+import { Plus, Trash2, Edit2, Ticket, ArrowUpDown, Loader2, Power } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDate, isDateInPast, isDateInFuture } from "../utils/dateUtils";
 
@@ -34,6 +34,8 @@ export default function CouponCodeManager({ showNotification }) {
   const { data: coupons = [], isLoading } = useQuery({
     queryKey: ["coupon-codes"],
     queryFn: () => api.entities.CouponCode.list("-created_date"),
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const createMutation = useMutation({
@@ -446,6 +448,18 @@ export default function CouponCodeManager({ showNotification }) {
                           </td>
                           <td className="px-4 py-4 align-middle">
                             <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => updateMutation.mutate({ 
+                                  id: coupon.id, 
+                                  data: { ...coupon, is_active: !coupon.is_active } 
+                                })}
+                                className={`${coupon.is_active ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}`}
+                                title={coupon.is_active ? 'Deactivate' : 'Activate'}
+                              >
+                                <Power className="w-4 h-4" />
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"

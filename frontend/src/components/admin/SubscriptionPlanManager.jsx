@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Edit2, Sparkles, CheckCircle, ArrowUpDown, Zap, Crown, Rocket, Star, Loader2, DollarSign } from "lucide-react";
+import { Plus, Trash2, Edit2, Sparkles, CheckCircle, ArrowUpDown, Zap, Crown, Rocket, Star, Loader2, DollarSign, Power } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const ICON_OPTIONS = {
@@ -257,11 +257,15 @@ export default function SubscriptionPlanManager({ showNotification }) {
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ["subscription-plans"],
     queryFn: () => api.entities.SubscriptionPlan.list("order"),
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const { data: campaigns = [] } = useQuery({
     queryKey: ["marketing-campaigns"],
     queryFn: () => api.entities.MarketingCampaign.list("-created_date"),
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const sortedPlans = useMemo(() => {
@@ -733,6 +737,18 @@ Create content that flows beautifully across headlines, features, CTAs, and disc
                           </td>
                           <td className="px-4 py-4 align-middle">
                             <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => updateMutation.mutate({ 
+                                  id: plan.id, 
+                                  data: { ...plan, is_active: !plan.is_active } 
+                                })}
+                                className={`${plan.is_active ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}`}
+                                title={plan.is_active ? 'Deactivate' : 'Activate'}
+                              >
+                                <Power className="w-4 h-4" />
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"

@@ -4,13 +4,13 @@ import { authenticate, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
+const isUniqueViolation = (error) => {
+  return error.code === '23505';
+};
+
 router.get('/', authenticate, async (req, res) => {
   try {
-    let sql = 'SELECT * FROM ai_providers';
-    if (req.user.role !== 'admin') {
-      sql += ' WHERE is_active = true';
-    }
-    sql += ' ORDER BY is_default DESC, name ASC';
+    let sql = 'SELECT * FROM ai_providers ORDER BY name ASC';
     const result = await query(sql);
     res.json(result.rows);
   } catch (error) {
@@ -21,34 +21,40 @@ router.get('/', authenticate, async (req, res) => {
 
 router.post('/', authenticate, requireAdmin, async (req, res) => {
   try {
-    const { name, provider_type, api_key, custom_prompt, is_default, is_active } = req.body;
-    if (!name || !provider_type || !api_key) {
-      return res.status(400).json({ error: 'name, provider_type, and api_key are required' });
+    const { name, provider_type, api_endpoint, model_name, config } = req.body;
+    if (!name || !provider_type) {
+      return res.status(400).json({ error: 'name and provider_type are required' });
     }
-    if (is_default) {
-      await query('UPDATE ai_providers SET is_default = false');
-    }
-    const result = await query('INSERT INTO ai_providers (name, provider_type, api_key, custom_prompt, is_default, is_active) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *', [name, provider_type, api_key, custom_prompt, is_default || false, is_active !== false]);
+    const result = await query(
+      'INSERT INTO ai_providers (name, provider_type, api_endpoint, model_name, config) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [name, provider_type, api_endpoint, model_name, config || {}]
+    );
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Create provider error:', error);
+    if (isUniqueViolation(error)) {
+      return res.status(409).json({ error: 'A provider with this name already exists.' });
+    }
     res.status(500).json({ error: 'Failed to create provider' });
   }
 });
 
 router.put('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
-    const { name, provider_type, api_key, custom_prompt, is_default, is_active } = req.body;
-    if (is_default) {
-      await query('UPDATE ai_providers SET is_default = false WHERE id != $1', [req.params.id]);
-    }
-    const result = await query('UPDATE ai_providers SET name = COALESCE($1, name), provider_type = COALESCE($2, provider_type), api_key = COALESCE($3, api_key), custom_prompt = COALESCE($4, custom_prompt), is_default = COALESCE($5, is_default), is_active = COALESCE($6, is_active), updated_at = NOW() WHERE id = $7 RETURNING *', [name, provider_type, api_key, custom_prompt, is_default, is_active, req.params.id]);
+    const { name, provider_type, api_endpoint, model_name, config, is_active } = req.body;
+    const result = await query(
+      'UPDATE ai_providers SET name = COALESCE($1, name), provider_type = COALESCE($2, provider_type), api_endpoint = COALESCE($3, api_endpoint), model_name = COALESCE($4, model_name), config = COALESCE($5, config), is_active = COALESCE($6, is_active), updated_at = NOW() WHERE id = $7 RETURNING *',
+      [name, provider_type, api_endpoint, model_name, config, is_active, req.params.id]
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Provider not found' });
     }
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Update provider error:', error);
+    if (isUniqueViolation(error)) {
+      return res.status(409).json({ error: 'A provider with this name already exists.' });
+    }
     res.status(500).json({ error: 'Failed to update provider' });
   }
 });

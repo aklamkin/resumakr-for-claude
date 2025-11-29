@@ -7,19 +7,30 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { FileText, Trash2, Star, AlertCircle, Loader2, Edit2, Plus } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertCircle, Loader2, Edit2, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { NotificationPopup } from "../components/ui/notification";
 import { motion } from "framer-motion";
+
+const PROMPT_TYPES = [
+  { value: "edit_bullet", label: "Edit Single Resume Bullet" },
+  { value: "edit_job", label: "Edit Entire Job" },
+  { value: "edit_resume", label: "Edit Entire Resume" },
+  { value: "generate_resume", label: "Generate Resume from Scratch" },
+  { value: "generate_pricing", label: "Generate Pricing Page" }
+];
 
 export default function SettingsPrompts() {
   const queryClient = useQueryClient();
   const [notification, setNotification] = useState({ open: false, title: "", message: "", type: "success" });
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [newPrompt, setNewPrompt] = useState({ name: "", prompt_text: "", is_default: false });
+  const [selectedType, setSelectedType] = useState("edit_bullet");
+  const [showDialog, setShowDialog] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState(null);
+  const [formData, setFormData] = useState({ name: "", prompt_text: "", provider_id: null });
+  const [expandedRow, setExpandedRow] = useState(null);
 
   React.useEffect(() => {
     api.auth.me().then(currentUser => {
@@ -34,23 +45,19 @@ export default function SettingsPrompts() {
     setNotification({ open: true, title, message, type });
   };
 
-  const { data: prompts = [] } = useQuery({
+  const { data: allPrompts = [], isLoading: promptsLoading } = useQuery({
     queryKey: ["custom-prompts"],
-    queryFn: async () => {
-      const currentUser = await api.auth.me();
-      return api.entities.CustomPrompt.filter({ created_by: currentUser.email });
-    },
+    queryFn: () => api.entities.CustomPrompt.list(),
     enabled: !loading,
   });
 
   const { data: providers = [] } = useQuery({
     queryKey: ["ai-providers"],
-    queryFn: async () => {
-      const currentUser = await api.auth.me();
-      return api.entities.AIProvider.filter({ created_by: currentUser.email }, "order");
-    },
+    queryFn: () => api.entities.AIProvider.list(),
     enabled: !loading,
   });
+
+  const filteredPrompts = allPrompts.filter(p => p.prompt_type === selectedType);
 
   const createPromptMutation = useMutation({
     mutationFn: (data) => api.entities.CustomPrompt.create(data),
@@ -60,7 +67,8 @@ export default function SettingsPrompts() {
       showNotification("Prompt created successfully!", "Success");
     },
     onError: (error) => {
-      showNotification("Failed to create prompt.", "Error", "error");
+      const message = error.response?.data?.error || "Failed to create prompt.";
+      showNotification(message, "Error", "error");
     }
   });
 
@@ -72,7 +80,8 @@ export default function SettingsPrompts() {
       showNotification("Prompt updated successfully!", "Success");
     },
     onError: (error) => {
-      showNotification("Failed to update prompt.", "Error", "error");
+      const message = error.response?.data?.error || "Failed to update prompt.";
+      showNotification(message, "Error", "error");
     }
   });
 
@@ -87,99 +96,88 @@ export default function SettingsPrompts() {
     }
   });
 
-  const updateProviderMutation = useMutation({
-    mutationFn: ({ id, data }) => api.entities.AIProvider.update(id, data),
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, is_active }) => api.entities.CustomPrompt.update(id, { is_active }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ai-providers"] });
-      showNotification("Provider assignments updated!", "Success");
+      queryClient.invalidateQueries({ queryKey: ["custom-prompts"] });
+      showNotification("Prompt status updated!", "Success");
     },
+    onError: (error) => {
+      const message = error.response?.data?.error || "Failed to update prompt status.";
+      showNotification(message, "Error", "error");
+    }
+  });
+
+  const updateProviderMutation = useMutation({
+    mutationFn: ({ id, provider_id }) => api.entities.CustomPrompt.update(id, { provider_id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["custom-prompts"] });
+      showNotification("Provider updated successfully!", "Success");
+    },
+    onError: (error) => {
+      showNotification("Failed to update provider.", "Error", "error");
+    }
   });
 
   const resetForm = () => {
-    setNewPrompt({ name: "", prompt_text: "", is_default: false });
+    setFormData({ name: "", prompt_text: "", provider_id: null });
     setEditingPrompt(null);
-    setShowForm(false);
+    setShowDialog(false);
   };
 
-  const handleSavePrompt = () => {
-    if (!newPrompt.name?.trim() || !newPrompt.prompt_text?.trim()) {
+  const handleOpenCreate = () => {
+    resetForm();
+    setShowDialog(true);
+  };
+
+  const handleOpenEdit = (prompt) => {
+    setEditingPrompt(prompt);
+    setFormData({
+      name: prompt.name || "",
+      prompt_text: prompt.prompt_text || "",
+      provider_id: prompt.provider_id || null
+    });
+    setShowDialog(true);
+  };
+
+  const handleSave = () => {
+    if (!formData.name?.trim() || !formData.prompt_text?.trim()) {
       showNotification("Please fill in prompt name and text.", "Missing Information", "error");
       return;
     }
 
+    const data = {
+      ...formData,
+      prompt_type: selectedType,
+      is_active: false
+    };
+
     if (editingPrompt) {
-      updatePromptMutation.mutate({ id: editingPrompt.id, data: newPrompt });
+      updatePromptMutation.mutate({ id: editingPrompt.id, data });
     } else {
-      createPromptMutation.mutate({ ...newPrompt, created_by: user.email });
+      createPromptMutation.mutate(data);
     }
   };
 
-  const handleEditPrompt = (prompt) => {
-    setEditingPrompt(prompt);
-    setNewPrompt({
-      name: prompt.name || "",
-      prompt_text: prompt.prompt_text || "",
-      is_default: prompt.is_default || false
+  const handleToggleActive = (prompt) => {
+    // If activating this prompt, backend will automatically deactivate others of same type
+    toggleActiveMutation.mutate({ id: prompt.id, is_active: !prompt.is_active });
+  };
+
+  const handleProviderChange = (promptId, providerId) => {
+    updateProviderMutation.mutate({
+      id: promptId,
+      provider_id: providerId === "none" ? null : parseInt(providerId)
     });
-    setShowForm(true);
   };
 
-  const handleToggleDefaultPrompt = async (promptId) => {
-    const prompt = prompts.find(p => p.id === promptId);
-    if (!prompt) return;
-
-    try {
-      if (prompt.is_default) {
-        await updatePromptMutation.mutateAsync({
-          id: promptId,
-          data: { name: prompt.name, prompt_text: prompt.prompt_text, is_default: false }
-        });
-      } else {
-        for (const p of prompts) {
-          if (p.is_default && p.id !== promptId) {
-            await updatePromptMutation.mutateAsync({
-              id: p.id,
-              data: { name: p.name, prompt_text: p.prompt_text, is_default: false }
-            });
-          }
-        }
-        await updatePromptMutation.mutateAsync({
-          id: promptId,
-          data: { name: prompt.name, prompt_text: prompt.prompt_text, is_default: true }
-        });
-      }
-    } catch (error) {
-      showNotification("Error updating prompt.", "Error", "error");
-    }
+  const truncateText = (text, lines = 2) => {
+    const lineHeight = 20;
+    const maxHeight = lines * lineHeight;
+    return text;
   };
 
-  const handleAssignProvidersToPrompt = async (promptId, selectedProviderIds) => {
-    const mutations = [];
-
-    providers.forEach(provider => {
-      const shouldHavePrompt = selectedProviderIds.includes(provider.id);
-      const currentlyHasPrompt = provider.custom_prompt_id === promptId;
-
-      if (shouldHavePrompt && !currentlyHasPrompt) {
-        mutations.push({ id: provider.id, data: { ...provider, custom_prompt_id: promptId } });
-      } else if (!shouldHavePrompt && currentlyHasPrompt) {
-        mutations.push({ id: provider.id, data: { ...provider, custom_prompt_id: null } });
-      }
-    });
-
-    try {
-      for (const mutation of mutations) {
-        await updateProviderMutation.mutateAsync(mutation);
-      }
-      showNotification("Provider assignments updated successfully!", "Success");
-    } catch (error) {
-      showNotification("Failed to update provider assignments.", "Error", "error");
-    }
-  };
-
-  const defaultPrompt = prompts.find(p => p.is_default);
-
-  if (loading) {
+  if (loading || promptsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 flex items-center justify-center p-6">
         <div className="text-center">
@@ -208,255 +206,277 @@ export default function SettingsPrompts() {
     );
   }
 
+  const activePrompt = filteredPrompts.find(p => p.is_active);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 p-6">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100 mb-2">Custom Prompts</h1>
-          <p className="text-slate-600 dark:text-slate-400">Manage AI prompts for resume improvements</p>
+          <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100 mb-2">AI Prompts</h1>
+          <p className="text-slate-600 dark:text-slate-400">Manage AI prompts by type and assign providers</p>
         </motion.div>
 
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <div />
-            <Button
-              onClick={() => {
-                resetForm();
-                setShowForm(true);
-              }}
-              className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              New Prompt
-            </Button>
+        <Card className="p-6 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 mb-6">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex-1 min-w-[300px]">
+              <Label className="text-sm font-medium mb-2 block text-slate-900 dark:text-slate-200">
+                Select Prompt Type
+              </Label>
+              <Select value={selectedType} onValueChange={setSelectedType}>
+                <SelectTrigger className="w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700">
+                  {PROMPT_TYPES.map(type => (
+                    <SelectItem key={type.value} value={type.value} className="dark:hover:bg-slate-700">
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-end">
+              <Button
+                onClick={handleOpenCreate}
+                className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                New Prompt
+              </Button>
+            </div>
           </div>
 
-          {defaultPrompt && (
-            <Card className="p-4 border-2 border-indigo-200 bg-indigo-50 dark:bg-indigo-950 dark:border-indigo-800">
-              <h3 className="font-semibold text-indigo-900 dark:text-indigo-200 mb-2">Default Prompt</h3>
-              <p className="text-sm text-indigo-800 dark:text-indigo-300">
-                This prompt will be used for any provider without a specific prompt assigned: <strong>{defaultPrompt.name}</strong>
-              </p>
-            </Card>
-          )}
-
-          {showForm && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <Card className="p-6 border-2 border-indigo-200 dark:border-indigo-700 bg-white dark:bg-slate-800">
-                <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-6">
-                  {editingPrompt ? "Edit Prompt" : "Create New Prompt"}
-                </h3>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-slate-900 dark:text-slate-200">Prompt Name</Label>
-                    <Input
-                      value={newPrompt.name || ""}
-                      onChange={(e) => setNewPrompt({...newPrompt, name: e.target.value})}
-                      placeholder="e.g., Professional & Concise, ATS-Optimized"
-                      className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-slate-900 dark:text-slate-200">Prompt Text</Label>
-                    <Textarea
-                      value={newPrompt.prompt_text || ""}
-                      onChange={(e) => setNewPrompt({...newPrompt, prompt_text: e.target.value})}
-                      placeholder="Improve the following resume section to be more professional and impactful: {section_content}"
-                      className="h-48 font-mono text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700"
-                    />
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Use {'{section_content}'} as a placeholder for the resume section content
-                    </p>
-                  </div>
-
-                  <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
-                    <Button
-                      variant="outline"
-                      onClick={resetForm}
-                      className="border-slate-300 dark:border-slate-600"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleSavePrompt}
-                      disabled={!newPrompt.name?.trim() || !newPrompt.prompt_text?.trim()}
-                      className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
-                    >
-                      {editingPrompt ? "Update" : "Create"} Prompt
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          )}
-
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Your Custom Prompts</h3>
-
-            {prompts.length === 0 ? (
-              <Card className="p-12 border-2 border-dashed border-slate-300 bg-white dark:bg-slate-900 dark:border-slate-600">
-                <div className="text-center text-slate-600 dark:text-slate-400">
-                  <FileText className="w-12 h-12 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">No prompts yet</h3>
-                  <p className="text-slate-600 dark:text-slate-400">Create a custom prompt to get started</p>
-                </div>
-              </Card>
-            ) : (
-              <Card className="border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-                <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                  {prompts.map((prompt) => {
-                    const assignedProviders = providers.filter(p => p.custom_prompt_id === prompt.id);
-                    const assignedProviderIds = assignedProviders.map(p => p.id);
-
-                    return (
-                      <div key={prompt.id} className="p-6 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
-                        <div className="flex items-start gap-4">
-                          <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-700 dark:from-purple-500 dark:to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <FileText className="w-6 h-6 text-white" />
-                          </div>
-
-                          <div className="flex-1 min-w-0 space-y-4">
-                            <div>
-                              <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">{prompt.name}</h4>
-                              <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap line-clamp-3">
-                                {prompt.prompt_text}
-                              </p>
-                            </div>
-
-                            {providers.length > 0 && (
-                              <div className="pt-2">
-                                <Label className="text-sm font-medium mb-2 block text-slate-900 dark:text-slate-200">
-                                  Assign to providers:
-                                </Label>
-                                <Select
-                                  value={assignedProviderIds.length > 0 ? assignedProviderIds[0] : "none"}
-                                  onValueChange={(value) => {
-                                    if (value === "none") {
-                                      handleAssignProvidersToPrompt(prompt.id, []);
-                                    } else if (value === "all") {
-                                      handleAssignProvidersToPrompt(prompt.id, providers.map(p => p.id));
-                                    } else {
-                                      const newSelection = assignedProviderIds.includes(value)
-                                        ? assignedProviderIds.filter(id => id !== value)
-                                        : [...assignedProviderIds, value];
-                                      handleAssignProvidersToPrompt(prompt.id, newSelection);
-                                    }
-                                  }}
-                                >
-                                  <SelectTrigger className="w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
-                                    <SelectValue>
-                                      {assignedProviders.length === 0
-                                        ? "Not assigned to any provider"
-                                        : assignedProviders.length === providers.length
-                                        ? "All providers"
-                                        : `${assignedProviders.length} provider${assignedProviders.length > 1 ? 's' : ''}`
-                                      }
-                                    </SelectValue>
-                                  </SelectTrigger>
-                                  <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700">
-                                    <SelectItem value="none" className="dark:hover:bg-slate-700">
-                                      <span className="text-slate-600 dark:text-slate-400">No providers</span>
-                                    </SelectItem>
-                                    <SelectItem value="all" className="dark:hover:bg-slate-700">
-                                      <span className="font-medium text-slate-900 dark:text-slate-100">All providers</span>
-                                    </SelectItem>
-                                    {providers.map(provider => (
-                                      <SelectItem key={provider.id} value={provider.id} className="dark:hover:bg-slate-700">
-                                        <div className="flex items-center gap-2">
-                                          <div className={`w-3 h-3 rounded border-2 ${
-                                            assignedProviderIds.includes(provider.id)
-                                              ? 'bg-indigo-600 border-indigo-600'
-                                              : 'border-slate-300'
-                                          }`} />
-                                          <span className="text-slate-900 dark:text-slate-100">{provider.name}</span>
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-
-                                {assignedProviders.length > 0 && (
-                                  <div className="mt-2 flex flex-wrap gap-2">
-                                    {assignedProviders.map(p => (
-                                      <Badge key={p.id} variant="secondary" className="text-xs">
-                                        {p.name}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex gap-2 flex-shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleToggleDefaultPrompt(prompt.id)}
-                              className={prompt.is_default ? "text-yellow-600 dark:text-yellow-400" : "text-slate-400 dark:text-slate-500"}
-                              title={prompt.is_default ? "Remove as default" : "Set as default"}
-                            >
-                              <Star className={`w-4 h-4 ${prompt.is_default ? 'fill-current' : ''}`} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditPrompt(prompt)}
-                              className="text-indigo-600 dark:text-indigo-400"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => deletePromptMutation.mutate(prompt.id)}
-                              className="text-red-600 dark:text-red-400"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </Card>
-            )}
-          </div>
-
-          <Card className="p-6 border-2 border-indigo-200 bg-indigo-50 dark:bg-indigo-950 dark:border-indigo-800">
-            <h4 className="font-semibold text-indigo-900 dark:text-indigo-200 mb-2">Example Prompts</h4>
-            <div className="space-y-3 text-sm">
-              <p className="p-3 bg-white rounded border border-indigo-200 dark:bg-slate-800 dark:border-indigo-800 text-slate-900 dark:text-slate-100">
-                "Rewrite the following resume section to be more concise and achievement-focused, using strong action verbs: {'{section_content}'}"
-              </p>
-              <p className="p-3 bg-white rounded border border-indigo-200 dark:bg-slate-800 dark:border-indigo-800 text-slate-900 dark:text-slate-100">
-                "Enhance this resume section with quantifiable metrics and specific achievements: {'{section_content}'}"
-              </p>
-              <p className="p-3 bg-white rounded border border-indigo-200 dark:bg-slate-800 dark:border-indigo-800 text-slate-900 dark:text-slate-100">
-                "Improve the following to better align with ATS systems: {'{section_content}'}"
+          {activePrompt && (
+            <div className="mt-4 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+              <p className="text-sm text-green-900 dark:text-green-200">
+                <strong>Active prompt for this type:</strong> {activePrompt.name}
               </p>
             </div>
-          </Card>
-        </div>
-      </div>
+          )}
+        </Card>
 
-      <NotificationPopup
-        open={notification.open}
-        onClose={() => setNotification({ ...notification, open: false })}
-        title={notification.title}
-        message={notification.message}
-        type={notification.type}
-      />
+        <Card className="border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+          {filteredPrompts.length === 0 ? (
+            <div className="p-12 text-center">
+              <AlertCircle className="w-12 h-12 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">No prompts yet</h3>
+              <p className="text-slate-600 dark:text-slate-400 mb-4">
+                Create a prompt for this type to get started
+              </p>
+              <Button onClick={handleOpenCreate} className="bg-indigo-600 hover:bg-indigo-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Create First Prompt
+              </Button>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="dark:border-slate-700">
+                  <TableHead className="text-slate-900 dark:text-slate-100">Name</TableHead>
+                  <TableHead className="text-slate-900 dark:text-slate-100">Prompt Preview</TableHead>
+                  <TableHead className="text-slate-900 dark:text-slate-100">Provider</TableHead>
+                  <TableHead className="text-center text-slate-900 dark:text-slate-100">Active</TableHead>
+                  <TableHead className="text-right text-slate-900 dark:text-slate-100">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredPrompts.map((prompt) => {
+                  const isExpanded = expandedRow === prompt.id;
+                  const provider = providers.find(p => p.id === prompt.provider_id);
+
+                  return (
+                    <TableRow key={prompt.id} className="dark:border-slate-700">
+                      <TableCell className="font-medium text-slate-900 dark:text-slate-100 max-w-[200px]">
+                        {prompt.name}
+                      </TableCell>
+                      <TableCell className="max-w-[400px]">
+                        <div className="space-y-2">
+                          <p className={`text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap ${!isExpanded ? 'line-clamp-2' : ''}`}>
+                            {prompt.prompt_text}
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setExpandedRow(isExpanded ? null : prompt.id)}
+                            className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 p-0 h-auto"
+                          >
+                            {isExpanded ? (
+                              <>
+                                <ChevronUp className="w-3 h-3 mr-1" />
+                                Show less
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="w-3 h-3 mr-1" />
+                                Show more
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={prompt.provider_id?.toString() || "none"}
+                          onValueChange={(value) => handleProviderChange(prompt.id, value)}
+                        >
+                          <SelectTrigger className="w-[200px] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
+                            <SelectValue>
+                              {provider ? provider.name : "No provider"}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700">
+                            <SelectItem value="none" className="dark:hover:bg-slate-700">
+                              <span className="text-slate-500 dark:text-slate-400">No provider</span>
+                            </SelectItem>
+                            {providers.map(p => (
+                              <SelectItem key={p.id} value={p.id.toString()} className="dark:hover:bg-slate-700">
+                                {p.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleActive(prompt)}
+                          className={`${
+                            prompt.is_active
+                              ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800"
+                              : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600"
+                          }`}
+                          title={prompt.is_active ? "Deactivate (click to disable)" : "Activate (click to enable)"}
+                        >
+                          {prompt.is_active ? "Active" : "Inactive"}
+                        </Button>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenEdit(prompt)}
+                            className="text-indigo-600 dark:text-indigo-400"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to delete "${prompt.name}"?`)) {
+                                deletePromptMutation.mutate(prompt.id);
+                              }
+                            }}
+                            className="text-red-600 dark:text-red-400"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </Card>
+
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent className="max-w-3xl bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">
+            <DialogHeader>
+              <DialogTitle className="text-slate-900 dark:text-slate-100">
+                {editingPrompt ? "Edit Prompt" : "Create New Prompt"}
+              </DialogTitle>
+              <DialogDescription className="text-slate-600 dark:text-slate-400">
+                {editingPrompt ? "Update the prompt details below." : `Create a new prompt for "${PROMPT_TYPES.find(t => t.value === selectedType)?.label}".`}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label className="text-slate-900 dark:text-slate-200">Prompt Name</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  placeholder="e.g., Professional & Concise"
+                  className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-slate-900 dark:text-slate-200">Prompt Text</Label>
+                <Textarea
+                  value={formData.prompt_text}
+                  onChange={(e) => setFormData({...formData, prompt_text: e.target.value})}
+                  placeholder="Enter the full prompt text that will be sent to the AI..."
+                  className="h-48 font-mono text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-slate-900 dark:text-slate-200">AI Provider (Optional)</Label>
+                <Select
+                  value={formData.provider_id?.toString() || "none"}
+                  onValueChange={(value) => setFormData({...formData, provider_id: value === "none" ? null : parseInt(value)})}
+                >
+                  <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
+                    <SelectValue>
+                      {formData.provider_id
+                        ? providers.find(p => p.id === formData.provider_id)?.name
+                        : "No provider"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700">
+                    <SelectItem value="none" className="dark:hover:bg-slate-700">
+                      <span className="text-slate-500 dark:text-slate-400">No provider</span>
+                    </SelectItem>
+                    {providers.map(p => (
+                      <SelectItem key={p.id} value={p.id.toString()} className="dark:hover:bg-slate-700">
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Select which AI provider should use this prompt
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={resetForm}
+                className="border-slate-300 dark:border-slate-600"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={!formData.name?.trim() || !formData.prompt_text?.trim()}
+                className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+              >
+                {editingPrompt ? "Update" : "Create"} Prompt
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <NotificationPopup
+          open={notification.open}
+          onClose={() => setNotification({ ...notification, open: false })}
+          title={notification.title}
+          message={notification.message}
+          type={notification.type}
+        />
+      </div>
     </div>
   );
 }

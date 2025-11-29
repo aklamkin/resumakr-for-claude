@@ -1,5 +1,5 @@
 import express from 'express';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query } from '../config/database.js';
 import { authenticate } from '../middleware/auth.js';
@@ -8,25 +8,50 @@ const router = express.Router();
 
 router.post('/register', async (req, res) => {
   try {
+    console.log('Registration attempt:', { email: req.body.email });
+    
     const { email, password, full_name } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password required' });
     }
+    
+    console.log('Checking for existing user...');
     const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) {
       return res.status(409).json({ error: 'User already exists' });
     }
-    const hashedPassword = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS) || 10);
+    
+    console.log('Hashing password with bcryptjs...');
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    console.log('Inserting user into database...');
     const result = await query(
       'INSERT INTO users (email, password, full_name, role, is_subscribed) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, full_name, role, is_subscribed, created_at',
       [email, hashedPassword, full_name || '', 'user', false]
     );
+    
+    console.log('User created, generating token...');
     const user = result.rows[0];
     const token = jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
-    res.status(201).json({ user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role, is_subscribed: user.is_subscribed }, token });
+    
+    console.log('Registration successful');
+    res.status(201).json({ 
+      user: { 
+        id: user.id, 
+        email: user.email, 
+        full_name: user.full_name, 
+        role: user.role, 
+        is_subscribed: user.is_subscribed 
+      }, 
+      token 
+    });
   } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ error: 'Registration failed' });
+    console.error('Register error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
+    res.status(500).json({ error: 'Registration failed', details: error.message });
   }
 });
 
@@ -86,3 +111,42 @@ router.get('/check', authenticate, (req, res) => {
 });
 
 export default router;
+
+router.post('/change-password', authenticate, async (req, res) => {
+  try {
+    const { current_password, new_password } = req.body;
+    
+    if (!current_password || !new_password) {
+      return res.status(400).json({ error: 'Current and new password required' });
+    }
+    
+    if (new_password.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+    
+    // Get user's current password hash
+    const result = await query('SELECT password FROM users WHERE id = $1', [req.user.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const user = result.rows[0];
+    
+    // Verify current password
+    const validPassword = await bcrypt.compare(current_password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+    
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(new_password, 10);
+    
+    // Update password
+    await query('UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2', [hashedPassword, req.user.id]);
+    
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});

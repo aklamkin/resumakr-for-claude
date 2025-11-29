@@ -16,7 +16,9 @@ export default function SettingsInterface() {
   const [notification, setNotification] = useState({ open: false, title: "", message: "", type: "success" });
 
   const showNotification = (message, title = "", type = "success") => {
-    setNotification({ open: true, title, message, type });
+    if (notificationsEnabled) {
+      setNotification({ open: true, title, message, type });
+    }
   };
 
   const { isLoading } = useQuery({
@@ -25,21 +27,21 @@ export default function SettingsInterface() {
       const settings = await api.entities.AppSettings.list();
       const enabledSetting = settings.find(s => s.setting_key === 'notifications_enabled');
       const durationSetting = settings.find(s => s.setting_key === 'notification_duration');
-      
+
       if (enabledSetting) {
         setNotificationsEnabled(enabledSetting.setting_value === 'true');
       }
       if (durationSetting) {
         setNotificationDuration(parseInt(durationSetting.setting_value));
       }
-      
+
       return settings;
     }
   });
 
   const updateSettingMutation = useMutation({
-    mutationFn: ({ key, value }) => 
-      api.entities.AppSettings.update(key, { 
+    mutationFn: ({ key, value }) =>
+      api.entities.AppSettings.update(key, {
         setting_value: String(value),
         setting_type: typeof value === 'boolean' ? 'boolean' : 'number'
       }),
@@ -87,7 +89,7 @@ export default function SettingsInterface() {
         <CardContent className="space-y-6">
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Notifications</h3>
-            
+
             <div className="flex items-center justify-between p-4 border rounded-lg dark:border-slate-700">
               <div className="space-y-0.5">
                 <Label htmlFor="notifications-enabled">Enable Notifications</Label>
@@ -121,7 +123,7 @@ export default function SettingsInterface() {
                   onChange={handleDurationChange}
                   className="max-w-[200px]"
                 />
-                <Button 
+                <Button
                   onClick={handleDurationSave}
                   disabled={updateSettingMutation.isPending}
                 >
@@ -133,7 +135,7 @@ export default function SettingsInterface() {
           </div>
         </CardContent>
       </Card>
-      
+
       <NotificationPopup
         open={notification.open}
         onClose={() => setNotification({ ...notification, open: false })}
