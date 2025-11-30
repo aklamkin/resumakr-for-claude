@@ -21,13 +21,23 @@ router.get('/', authenticate, async (req, res) => {
 
 router.post('/', authenticate, requireAdmin, async (req, res) => {
   try {
-    const { name, provider_type, api_endpoint, model_name, config } = req.body;
+    const { name, provider_type, api_endpoint, api_url, model_name, config, api_key, is_default } = req.body;
     if (!name || !provider_type) {
       return res.status(400).json({ error: 'name and provider_type are required' });
     }
+
+    // Build config object with api_key if provided
+    const configObj = config || {};
+    if (api_key) {
+      configObj.api_key = api_key;
+    }
+
+    // Use api_url if provided, otherwise api_endpoint
+    const endpoint = api_url || api_endpoint;
+
     const result = await query(
-      'INSERT INTO ai_providers (name, provider_type, api_endpoint, model_name, config) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [name, provider_type, api_endpoint, model_name, config || {}]
+      'INSERT INTO ai_providers (name, provider_type, api_endpoint, model_name, config, is_default) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [name, provider_type, endpoint, model_name, configObj, is_default || false]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -41,10 +51,30 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
 
 router.put('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
-    const { name, provider_type, api_endpoint, model_name, config, is_active } = req.body;
+    const { name, provider_type, api_endpoint, api_url, model_name, config, is_active, is_default, api_key } = req.body;
+
+    // Get existing provider to merge config
+    const existing = await query('SELECT * FROM ai_providers WHERE id = $1', [req.params.id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Provider not found' });
+    }
+
+    // Build config object, merging with existing config
+    let configObj = existing.rows[0].config || {};
+    if (config) {
+      configObj = { ...configObj, ...config };
+    }
+    // Update api_key in config if provided
+    if (api_key) {
+      configObj.api_key = api_key;
+    }
+
+    // Use api_url if provided, otherwise api_endpoint
+    const endpoint = api_url || api_endpoint;
+
     const result = await query(
-      'UPDATE ai_providers SET name = COALESCE($1, name), provider_type = COALESCE($2, provider_type), api_endpoint = COALESCE($3, api_endpoint), model_name = COALESCE($4, model_name), config = COALESCE($5, config), is_active = COALESCE($6, is_active), updated_at = NOW() WHERE id = $7 RETURNING *',
-      [name, provider_type, api_endpoint, model_name, config, is_active, req.params.id]
+      'UPDATE ai_providers SET name = COALESCE($1, name), provider_type = COALESCE($2, provider_type), api_endpoint = COALESCE($3, api_endpoint), model_name = COALESCE($4, model_name), config = COALESCE($5, config), is_active = COALESCE($6, is_active), is_default = COALESCE($7, is_default), updated_at = NOW() WHERE id = $8 RETURNING *',
+      [name, provider_type, endpoint, model_name, configObj, is_active, is_default, req.params.id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Provider not found' });
