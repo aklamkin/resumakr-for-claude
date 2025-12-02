@@ -1,5 +1,6 @@
 import express from 'express';
 import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { query } from '../config/database.js';
 import { authenticate, requireSubscription } from '../middleware/auth.js';
 
@@ -12,11 +13,69 @@ async function getActiveProviders() {
   return result.rows;
 }
 
-function getAIClient(provider) {
+export function getAIClient(provider) {
+  const apiKey = provider.api_key || provider.config?.api_key;
+
   if (provider.provider_type === 'openai') {
-    return new OpenAI({ apiKey: provider.api_key });
+    if (!apiKey) {
+      throw new Error('OpenAI API key not configured');
+    }
+    return { type: 'openai', client: new OpenAI({ apiKey }) };
+  } else if (provider.provider_type === 'gemini') {
+    if (!apiKey) {
+      throw new Error('Gemini API key not configured');
+    }
+    return { type: 'gemini', client: new GoogleGenerativeAI(apiKey) };
   }
+
   throw new Error(`Provider type ${provider.provider_type} not supported`);
+}
+
+export async function callAI(aiClientWrapper, prompt, systemPrompt, modelName, options = {}) {
+  const { type, client } = aiClientWrapper;
+
+  if (type === 'openai') {
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: prompt }
+    ];
+
+    const completion = await client.chat.completions.create({
+      model: modelName,
+      messages,
+      temperature: options.temperature ?? 0.7,
+      max_tokens: options.max_tokens ?? 2000
+    });
+
+    return {
+      content: completion.choices[0].message.content,
+      usage: completion.usage
+    };
+  } else if (type === 'gemini') {
+    const model = client.getGenerativeModel({ model: modelName });
+
+    const fullPrompt = `${systemPrompt}\n\n${prompt}`;
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+      generationConfig: {
+        temperature: options.temperature ?? 0.7,
+        maxOutputTokens: options.max_tokens ?? 2000
+      }
+    });
+
+    const response = result.response;
+    return {
+      content: response.text(),
+      usage: {
+        prompt_tokens: response.usageMetadata?.promptTokenCount || 0,
+        completion_tokens: response.usageMetadata?.candidatesTokenCount || 0,
+        total_tokens: response.usageMetadata?.totalTokenCount || 0
+      }
+    };
+  }
+
+  throw new Error(`Unsupported AI client type: ${type}`);
 }
 
 router.post('/invoke', async (req, res) => {
