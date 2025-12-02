@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Brain, Plus, Trash2, CheckCircle, AlertCircle, Loader2, Edit2, Power, X } from "lucide-react";
+import { Brain, Plus, Trash2, CheckCircle, AlertCircle, Loader2, Edit2, Power, X, Star } from "lucide-react";
 import { NotificationPopup, ConfirmDialog } from "../components/ui/notification";
 import { motion } from "framer-motion";
 
@@ -527,6 +527,16 @@ export default function SettingsProviders() {
                           </div>
 
                           <div className="flex gap-2 flex-shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSetDefault(provider.id)}
+                              className={`${provider.is_default ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}`}
+                              title={provider.is_default ? 'Remove as default' : 'Set as default'}
+                              disabled={updateProviderMutation.isPending}
+                            >
+                              <Star className={`w-4 h-4 ${provider.is_default ? 'fill-current' : ''}`} />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
