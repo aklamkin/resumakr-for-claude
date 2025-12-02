@@ -16,15 +16,25 @@ async function getActiveProviders() {
 export function getAIClient(provider) {
   const apiKey = provider.api_key || provider.config?.api_key;
 
-  if (provider.provider_type === 'openai') {
-    if (!apiKey) {
-      throw new Error('OpenAI API key not configured');
+  if (!apiKey) {
+    throw new Error(`${provider.provider_type} API key not configured`);
+  }
+
+  // OpenAI-compatible providers (OpenAI, OpenRouter, Groq, Perplexity, etc.)
+  const openaiCompatibleProviders = ['openai', 'openrouter', 'groq', 'perplexity', 'deepseek', 'mistral'];
+
+  if (openaiCompatibleProviders.includes(provider.provider_type)) {
+    const config = { apiKey };
+
+    // Set custom base URL for non-OpenAI providers
+    if (provider.provider_type !== 'openai' && provider.api_url) {
+      // Extract base URL from the full API endpoint
+      const url = new URL(provider.api_url);
+      config.baseURL = `${url.protocol}//${url.host}/v1`;
     }
-    return { type: 'openai', client: new OpenAI({ apiKey }) };
+
+    return { type: 'openai', client: new OpenAI(config) };
   } else if (provider.provider_type === 'gemini') {
-    if (!apiKey) {
-      throw new Error('Gemini API key not configured');
-    }
     return { type: 'gemini', client: new GoogleGenerativeAI(apiKey) };
   }
 

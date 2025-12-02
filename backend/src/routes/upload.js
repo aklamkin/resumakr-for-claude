@@ -162,6 +162,13 @@ CRITICAL:
     let modelsToTry = [];
     if (provider.provider_type === 'openai') {
       modelsToTry = ['gpt-4o', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo'];
+    } else if (provider.provider_type === 'openrouter') {
+      // OpenRouter uses provider/model format
+      modelsToTry = ['openai/gpt-4o', 'openai/gpt-4-turbo', 'anthropic/claude-3.5-sonnet', 'meta-llama/llama-3.1-70b-instruct'];
+    } else if (provider.provider_type === 'groq') {
+      modelsToTry = ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768'];
+    } else if (provider.provider_type === 'perplexity') {
+      modelsToTry = ['llama-3.1-sonar-large-128k-online', 'llama-3.1-sonar-small-128k-online'];
     } else if (provider.provider_type === 'gemini') {
       // Use only experimental flash model that's available in free tier
       modelsToTry = ['gemini-2.0-flash-exp'];
