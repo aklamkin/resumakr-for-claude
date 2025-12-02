@@ -216,20 +216,12 @@ export default function SettingsProviders() {
     const provider = providers.find(p => p.id === providerId);
     if (!provider) return;
 
-    try {
-      if (provider.is_default) {
-        await updateProviderMutation.mutateAsync({ id: providerId, data: { ...provider, is_default: false } });
-      } else {
-        for (const p of providers) {
-          if (p.is_default && p.id !== providerId) {
-            await updateProviderMutation.mutateAsync({ id: p.id, data: { ...p, is_default: false } });
-          }
-        }
-        await updateProviderMutation.mutateAsync({ id: providerId, data: { ...provider, is_default: true } });
-      }
-    } catch (error) {
-      showNotification("Error updating provider. Please try again.", "Error", "error");
-    }
+    // Backend now handles unsetting other providers atomically
+    const newDefaultValue = !provider.is_default;
+    await updateProviderMutation.mutateAsync({
+      id: providerId,
+      data: { ...provider, is_default: newDefaultValue }
+    });
   };
 
   const handleDeleteClick = (provider) => {

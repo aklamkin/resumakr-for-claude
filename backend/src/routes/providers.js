@@ -35,6 +35,11 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
     // Use api_url if provided, otherwise api_endpoint
     const endpoint = api_url || api_endpoint;
 
+    // If setting this provider as default, unset all other defaults atomically
+    if (is_default === true) {
+      await query('UPDATE ai_providers SET is_default = false');
+    }
+
     const result = await query(
       'INSERT INTO ai_providers (name, provider_type, api_endpoint, model_name, config, is_default) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [name, provider_type, endpoint, model_name, configObj, is_default || false]
@@ -71,6 +76,11 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
 
     // Use api_url if provided, otherwise api_endpoint
     const endpoint = api_url || api_endpoint;
+
+    // If setting this provider as default, unset all other defaults atomically
+    if (is_default === true) {
+      await query('UPDATE ai_providers SET is_default = false WHERE id != $1', [req.params.id]);
+    }
 
     const result = await query(
       'UPDATE ai_providers SET name = COALESCE($1, name), provider_type = COALESCE($2, provider_type), api_endpoint = COALESCE($3, api_endpoint), model_name = COALESCE($4, model_name), config = COALESCE($5, config), is_active = COALESCE($6, is_active), is_default = COALESCE($7, is_default), updated_at = NOW() WHERE id = $8 RETURNING *',

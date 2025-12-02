@@ -9,8 +9,12 @@ router.use(authenticate);
 router.use(requireSubscription);
 
 async function getActiveProviders() {
-  const result = await query('SELECT * FROM ai_providers WHERE is_active = true ORDER BY is_default DESC');
-  return result.rows;
+  // Get default provider first, then other active providers
+  const defaultResult = await query('SELECT * FROM ai_providers WHERE is_active = true AND is_default = true LIMIT 1');
+  const othersResult = await query('SELECT * FROM ai_providers WHERE is_active = true AND is_default = false ORDER BY created_at ASC');
+
+  // Return default first, then others
+  return [...defaultResult.rows, ...othersResult.rows];
 }
 
 export function getAIClient(provider) {
@@ -102,11 +106,18 @@ router.post('/invoke', async (req, res) => {
       }
       provider = result.rows[0];
     } else {
-      const providers = await getActiveProviders();
-      if (providers.length === 0) {
-        return res.status(503).json({ error: 'No active AI providers configured' });
+      // Get the default provider explicitly
+      const defaultProviders = await query('SELECT * FROM ai_providers WHERE is_active = true AND is_default = true LIMIT 1');
+      if (defaultProviders.rows.length > 0) {
+        provider = defaultProviders.rows[0];
+      } else {
+        // Fallback to first active provider if no default set
+        const providers = await getActiveProviders();
+        if (providers.length === 0) {
+          return res.status(503).json({ error: 'No active AI providers configured' });
+        }
+        provider = providers[0];
       }
-      provider = providers[0];
     }
     const client = getAIClient(provider);
     const messages = [{ role: 'system', content: provider.custom_prompt || 'You are a helpful AI assistant for resume writing.' }, { role: 'user', content: prompt }];
@@ -162,10 +173,19 @@ router.post('/analyze-ats', async (req, res) => {
     }
     const resumeText = `Professional Summary: ${resume_data.professional_summary || ''}\n\nWork Experience:\n${resume_data.work_experience?.map(job => `${job.position} at ${job.company}\n${job.responsibilities?.join('\n')}`).join('\n') || ''}\n\nSkills: ${resume_data.skills?.flatMap(s => s.items).join(', ') || ''}`.trim();
     const prompt = `Analyze this resume against the job description for ATS compatibility.\n\nJob Description:\n${job_description}\n\nResume:\n${resumeText}\n\nProvide JSON: {"score": <0-100>, "keywords_extracted_jd": [...], "keywords_found_resume": [...], "missing_keywords": [...], "recommendations": [...]}`.trim();
-    const providers = await getActiveProviders();
-    const provider = providers[0];
-    if (!provider) {
-      return res.status(503).json({ error: 'No active AI providers configured' });
+
+    // Get the default provider explicitly
+    const defaultProviders = await query('SELECT * FROM ai_providers WHERE is_active = true AND is_default = true LIMIT 1');
+    let provider;
+    if (defaultProviders.rows.length > 0) {
+      provider = defaultProviders.rows[0];
+    } else {
+      // Fallback to first active provider if no default set
+      const providers = await getActiveProviders();
+      if (providers.length === 0) {
+        return res.status(503).json({ error: 'No active AI providers configured' });
+      }
+      provider = providers[0];
     }
     const client = getAIClient(provider);
     const completion = await client.chat.completions.create({ model: 'gpt-4', messages: [{ role: 'system', content: 'You are an expert ATS system analyst.' }, { role: 'user', content: prompt }], temperature: 0.3, max_tokens: 1500 });

@@ -110,14 +110,21 @@ router.post('/extract', async (req, res) => {
       });
     }
 
-    // Get the default AI provider
-    const providers = await query('SELECT * FROM ai_providers WHERE is_active = true ORDER BY is_default DESC LIMIT 1');
+    // Get the default AI provider (explicitly check for is_default=true first)
+    let providers = await query('SELECT * FROM ai_providers WHERE is_active = true AND is_default = true LIMIT 1');
+
+    // If no default provider, fall back to any active provider
+    if (providers.rows.length === 0) {
+      console.log('[EXTRACT] No default provider set, falling back to first active provider');
+      providers = await query('SELECT * FROM ai_providers WHERE is_active = true ORDER BY created_at ASC LIMIT 1');
+    }
+
     if (providers.rows.length === 0) {
       console.error('[EXTRACT] No active AI providers configured');
       return res.status(503).json({ error: 'No active AI providers configured' });
     }
     const provider = providers.rows[0];
-    console.log('[EXTRACT] Using provider:', provider.name, 'type:', provider.provider_type);
+    console.log('[EXTRACT] Using provider:', provider.name, 'type:', provider.provider_type, 'is_default:', provider.is_default);
 
     // Get AI client for the configured provider
     let aiClient;
