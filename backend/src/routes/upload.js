@@ -163,7 +163,7 @@ CRITICAL:
     if (provider.provider_type === 'openai') {
       modelsToTry = ['gpt-4o', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo'];
     } else if (provider.provider_type === 'gemini') {
-      modelsToTry = ['gemini-2.0-flash-exp', 'gemini-1.5-pro', 'gemini-1.5-flash'];
+      modelsToTry = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
     } else {
       modelsToTry = [provider.model_name || 'gpt-4'];
     }
