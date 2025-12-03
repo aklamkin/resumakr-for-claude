@@ -108,7 +108,7 @@ IMPORTANT: Try to naturally incorporate these keywords where genuinely applicabl
           const numVersions = 1; // Reduced to 1 version to avoid rate limits
           for (let i = 0; i < numVersions; i++) {
             const response = await api.integrations.Core.InvokeLLM({ prompt: fullPrompt });
-            allVersions.push(response);
+            allVersions.push(response.result || response);
             
             // Add delay between versions
             if (i < numVersions - 1) {
