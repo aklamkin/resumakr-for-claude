@@ -217,10 +217,9 @@ export default function SettingsProviders() {
     if (!provider) return;
 
     // Backend now handles unsetting other providers atomically
-    const newDefaultValue = !provider.is_default;
     await updateProviderMutation.mutateAsync({
       id: providerId,
-      data: { ...provider, is_default: newDefaultValue }
+      data: { ...provider, is_default: true }
     });
   };
 
