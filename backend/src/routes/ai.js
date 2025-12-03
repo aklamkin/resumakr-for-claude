@@ -31,10 +31,27 @@ export function getAIClient(provider) {
     const config = { apiKey };
 
     // Set custom base URL for non-OpenAI providers
-    if (provider.provider_type !== 'openai' && provider.api_url) {
-      // Extract base URL from the full API endpoint
-      const url = new URL(provider.api_url);
-      config.baseURL = `${url.protocol}//${url.host}/v1`;
+    if (provider.provider_type !== 'openai') {
+      // Check for api_url or api_endpoint (both fields are used)
+      const apiUrl = provider.api_url || provider.api_endpoint;
+
+      if (apiUrl) {
+        // Extract base URL from the full API endpoint
+        const url = new URL(apiUrl);
+        config.baseURL = `${url.protocol}//${url.host}/v1`;
+      } else {
+        // Use default base URLs for known providers
+        const defaultBaseUrls = {
+          'openrouter': 'https://openrouter.ai/api/v1',
+          'groq': 'https://api.groq.com/openai/v1',
+          'perplexity': 'https://api.perplexity.ai',
+          'deepseek': 'https://api.deepseek.com/v1',
+          'mistral': 'https://api.mistral.ai/v1'
+        };
+        if (defaultBaseUrls[provider.provider_type]) {
+          config.baseURL = defaultBaseUrls[provider.provider_type];
+        }
+      }
     }
 
     return { type: 'openai', client: new OpenAI(config) };
