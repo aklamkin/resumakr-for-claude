@@ -14,7 +14,15 @@ router.get('/', async (req, res) => {
       sql += ' AND status = $2';
       params.push(status);
     }
-    const sortColumn = sort.startsWith('-') ? sort.substring(1) : sort;
+
+    // Map frontend column names to actual database column names
+    const columnMapping = {
+      'updated_date': 'updated_at',
+      'created_date': 'created_at'
+    };
+
+    let sortColumn = sort.startsWith('-') ? sort.substring(1) : sort;
+    sortColumn = columnMapping[sortColumn] || sortColumn; // Map to actual column name
     const sortDirection = sort.startsWith('-') ? 'DESC' : 'ASC';
     sql += ` ORDER BY ${sortColumn} ${sortDirection} LIMIT $${params.length + 1}`;
     params.push(parseInt(limit));
