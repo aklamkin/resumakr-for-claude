@@ -35,10 +35,16 @@ export function getAIClient(provider) {
       // Check for api_url or api_endpoint (both fields are used)
       const apiUrl = provider.api_url || provider.api_endpoint;
 
+      console.log('[AI] Provider:', provider.name, 'Type:', provider.provider_type);
+      console.log('[AI] api_url:', provider.api_url);
+      console.log('[AI] api_endpoint:', provider.api_endpoint);
+      console.log('[AI] Resolved apiUrl:', apiUrl);
+
       if (apiUrl) {
         // Extract base URL from the full API endpoint
         const url = new URL(apiUrl);
         config.baseURL = `${url.protocol}//${url.host}/v1`;
+        console.log('[AI] Set baseURL from apiUrl:', config.baseURL);
       } else {
         // Use default base URLs for known providers
         const defaultBaseUrls = {
@@ -50,10 +56,14 @@ export function getAIClient(provider) {
         };
         if (defaultBaseUrls[provider.provider_type]) {
           config.baseURL = defaultBaseUrls[provider.provider_type];
+          console.log('[AI] Set baseURL from defaults:', config.baseURL);
+        } else {
+          console.log('[AI] No default baseURL found for provider type:', provider.provider_type);
         }
       }
     }
 
+    console.log('[AI] Final OpenAI config:', { baseURL: config.baseURL, hasApiKey: !!config.apiKey });
     return { type: 'openai', client: new OpenAI(config) };
   } else if (provider.provider_type === 'gemini') {
     return { type: 'gemini', client: new GoogleGenerativeAI(apiKey) };
