@@ -73,6 +73,8 @@ export default function SettingsProviders() {
   const [editingProviderId, setEditingProviderId] = useState(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState({ open: false, providerId: null, providerName: "" });
   const [editData, setEditData] = useState({});
+  const [openrouterModels, setOpenrouterModels] = useState([]);
+  const [loadingModels, setLoadingModels] = useState(false);
 
   React.useEffect(() => {
     api.auth.me().then(currentUser => {
@@ -86,6 +88,23 @@ export default function SettingsProviders() {
   const showNotification = (message, title = "", type = "success") => {
     setNotification({ open: true, title, message, type });
   };
+
+  // Fetch OpenRouter models
+  const fetchOpenRouterModels = async () => {
+    if (openrouterModels.length > 0) return; // Already fetched
+    setLoadingModels(true);
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/models');
+      const data = await response.json();
+      setOpenrouterModels(data.data || []);
+    } catch (error) {
+      console.error('Failed to fetch OpenRouter models:', error);
+      showNotification('Failed to load OpenRouter models', 'Error', 'error');
+    } finally {
+      setLoadingModels(false);
+    }
+  };
+
   const { data: providers = [], isLoading: loadingProviders } = useQuery({
     queryKey: ["ai-providers"],
     queryFn: () => api.entities.AIProvider.list()
@@ -132,6 +151,7 @@ export default function SettingsProviders() {
     name: PROVIDER_PRESETS.openai.name,
     api_url: PROVIDER_PRESETS.openai.api_url,
     api_key: "",
+    model_name: "",
     is_default: false,
     order: 0
   });
@@ -148,7 +168,12 @@ export default function SettingsProviders() {
       name: preset?.name || "",
       api_url: preset?.api_url || "",
       api_key: "",
+      model_name: "",
     });
+    // Fetch OpenRouter models if selecting OpenRouter
+    if (type === 'openrouter') {
+      fetchOpenRouterModels();
+    }
   };
 
   const resetForm = () => {
@@ -157,6 +182,7 @@ export default function SettingsProviders() {
       name: PROVIDER_PRESETS.openai.name,
       api_url: PROVIDER_PRESETS.openai.api_url,
       api_key: "",
+      model_name: "",
       is_default: false,
       order: providers.length + 1
     });
@@ -168,11 +194,16 @@ export default function SettingsProviders() {
     setEditData({
       provider_type: provider.provider_type || "openai",
       name: provider.name || "",
-      api_url: provider.api_url || "",
+      api_url: provider.api_url || provider.api_endpoint || "",
       api_key: "", // Leave empty, will only update if user enters new value
+      model_name: provider.model_name || "",
       is_default: provider.is_default || false,
       order: provider.order || 0
     });
+    // Fetch OpenRouter models if editing OpenRouter provider
+    if (provider.provider_type === 'openrouter') {
+      fetchOpenRouterModels();
+    }
   };
 
   const handleCancelEdit = () => {
@@ -371,6 +402,39 @@ export default function SettingsProviders() {
                     />
                   </div>
 
+                  {newProvider.provider_type === 'openrouter' && (
+                    <div className="space-y-2">
+                      <Label className="text-slate-900 dark:text-slate-200">Model {loadingModels && <Loader2 className="w-3 h-3 inline animate-spin" />}</Label>
+                      <Select
+                        value={newProvider.model_name}
+                        onValueChange={(value) => setNewProvider({...newProvider, model_name: value})}
+                      >
+                        <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
+                          <SelectValue placeholder="Select a model..." />
+                        </SelectTrigger>
+                        <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 max-h-64">
+                          {openrouterModels.map((model) => (
+                            <SelectItem key={model.id} value={model.id} className="dark:hover:bg-slate-700">
+                              {model.name || model.id}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {newProvider.provider_type !== 'openrouter' && (
+                    <div className="space-y-2">
+                      <Label className="text-slate-900 dark:text-slate-200">Model Name (optional)</Label>
+                      <Input
+                        value={newProvider.model_name}
+                        onChange={(e) => setNewProvider({...newProvider, model_name: e.target.value})}
+                        placeholder="e.g., gpt-4, claude-3, gemini-pro"
+                        className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700"
+                      />
+                    </div>
+                  )}
+
                   <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
                     <Button variant="outline" onClick={resetForm} className="border-slate-300 dark:border-slate-600">
                       Cancel
@@ -432,6 +496,10 @@ export default function SettingsProviders() {
                                   name: preset?.name || editData.name,
                                   api_url: preset?.api_url || editData.api_url,
                                 });
+                                // Fetch OpenRouter models if selecting OpenRouter
+                                if (type === 'openrouter') {
+                                  fetchOpenRouterModels();
+                                }
                               }}
                             >
                               <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
@@ -478,6 +546,39 @@ export default function SettingsProviders() {
                               className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700"
                             />
                           </div>
+
+                          {editData.provider_type === 'openrouter' && (
+                            <div className="space-y-2">
+                              <Label className="text-slate-900 dark:text-slate-200">Model {loadingModels && <Loader2 className="w-3 h-3 inline animate-spin" />}</Label>
+                              <Select
+                                value={editData.model_name}
+                                onValueChange={(value) => setEditData({...editData, model_name: value})}
+                              >
+                                <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
+                                  <SelectValue placeholder="Select a model..." />
+                                </SelectTrigger>
+                                <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 max-h-64">
+                                  {openrouterModels.map((model) => (
+                                    <SelectItem key={model.id} value={model.id} className="dark:hover:bg-slate-700">
+                                      {model.name || model.id}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
+                          {editData.provider_type !== 'openrouter' && (
+                            <div className="space-y-2">
+                              <Label className="text-slate-900 dark:text-slate-200">Model Name (optional)</Label>
+                              <Input
+                                value={editData.model_name}
+                                onChange={(e) => setEditData({...editData, model_name: e.target.value})}
+                                placeholder="e.g., gpt-4, claude-3, gemini-pro"
+                                className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700"
+                              />
+                            </div>
+                          )}
 
                           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
                             <Button
