@@ -42,8 +42,9 @@ export function getAIClient(provider) {
 
       if (apiUrl) {
         // Extract base URL from the full API endpoint
-        const url = new URL(apiUrl);
-        config.baseURL = `${url.protocol}//${url.host}/v1`;
+        // Remove /chat/completions if present
+        let cleanUrl = apiUrl.replace(/\/chat\/completions\/?$/, '');
+        config.baseURL = cleanUrl;
         console.log('[AI] Set baseURL from apiUrl:', config.baseURL);
       } else {
         // Use default base URLs for known providers
