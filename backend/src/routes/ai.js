@@ -147,12 +147,12 @@ router.post('/invoke', async (req, res) => {
         provider = providers[0];
       }
     }
-    const client = getAIClient(provider);
+    const { client: aiClient } = getAIClient(provider);
     const messages = [{ role: 'system', content: provider.custom_prompt || 'You are a helpful AI assistant for resume writing.' }, { role: 'user', content: prompt }];
     if (response_json_schema) {
       messages[1].content += '\n\nRespond ONLY with valid JSON matching this schema:\n' + JSON.stringify(response_json_schema, null, 2);
     }
-    const completion = await client.chat.completions.create({ model: model, messages: messages, temperature: 0.7, max_tokens: 2000 });
+    const completion = await aiClient.chat.completions.create({ model: model, messages: messages, temperature: 0.7, max_tokens: 2000 });
     const content = completion.choices[0].message.content;
     let result = content;
     if (response_json_schema) {
@@ -179,8 +179,8 @@ router.post('/improve-summary', async (req, res) => {
     const results = [];
     for (const provider of providers) {
       try {
-        const client = getAIClient(provider);
-        const completion = await client.chat.completions.create({ model: 'gpt-4', messages: [{ role: 'system', content: 'You are an expert resume writer.' }, { role: 'user', content: prompt }], temperature: 0.7, max_tokens: 500 });
+        const { client: aiClient } = getAIClient(provider);
+        const completion = await aiClient.chat.completions.create({ model: 'gpt-4', messages: [{ role: 'system', content: 'You are an expert resume writer.' }, { role: 'user', content: prompt }], temperature: 0.7, max_tokens: 500 });
         results.push({ provider_id: provider.id, provider_name: provider.name, improved_text: completion.choices[0].message.content.trim() });
       } catch (error) {
         console.error(`Provider ${provider.name} failed:`, error);
@@ -215,8 +215,8 @@ router.post('/analyze-ats', async (req, res) => {
       }
       provider = providers[0];
     }
-    const client = getAIClient(provider);
-    const completion = await client.chat.completions.create({ model: 'gpt-4', messages: [{ role: 'system', content: 'You are an expert ATS system analyst.' }, { role: 'user', content: prompt }], temperature: 0.3, max_tokens: 1500 });
+    const { client: aiClient } = getAIClient(provider);
+    const completion = await aiClient.chat.completions.create({ model: 'gpt-4', messages: [{ role: 'system', content: 'You are an expert ATS system analyst.' }, { role: 'user', content: prompt }], temperature: 0.3, max_tokens: 1500 });
     const content = completion.choices[0].message.content;
     const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const analysis = JSON.parse(cleaned);
