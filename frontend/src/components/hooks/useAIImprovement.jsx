@@ -105,7 +105,7 @@ IMPORTANT: Try to naturally incorporate these keywords where genuinely applicabl
         const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
 
         try {
-          const numVersions = 1; // Reduced to 1 version to avoid rate limits
+          const numVersions = 2; // Generate 2 AI versions for 3 total options (original + 2 AI)
           for (let i = 0; i < numVersions; i++) {
             const response = await api.integrations.Core.InvokeLLM({ prompt: fullPrompt });
             allVersions.push(response.result || response);

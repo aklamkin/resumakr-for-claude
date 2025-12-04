@@ -26,8 +26,6 @@ export default function ProfessionalSummarySection({
     providers 
   } = aiHelpers;
 
-  if (!summary) return null;
-
   const foundKeywords = atsResults?.keywords_found_resume || [];
   const missingKeywords = atsResults?.missing_keywords || [];
 
@@ -36,8 +34,9 @@ export default function ProfessionalSummarySection({
       <div>
         <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-3">Professional Summary</h3>
         <Textarea
-          value={summary}
+          value={summary || ''}
           onChange={(e) => onUpdate(e.target.value)}
+          placeholder="Write a brief professional summary (2-4 sentences)"
           className="h-32 text-slate-900 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 dark:placeholder-slate-500"
         />
       </div>
@@ -71,7 +70,7 @@ export default function ProfessionalSummarySection({
         )}
       </div>
       <EditableSection
-        content={summary}
+        content={summary || 'No professional summary yet. Click "Improve" to generate one with AI.'}
         providers={providers}
         loading={sectionLoading['summary']}
         versions={sectionVersions['summary']}
@@ -80,7 +79,7 @@ export default function ProfessionalSummarySection({
             onSubscriptionRequired();
             return;
           }
-          requestVersions('summary', summary, providerId);
+          requestVersions('summary', summary || '', providerId);
         }}
         onAcceptVersion={(version, keepOriginal) => acceptVersion('summary', version, 'professional_summary')}
         foundKeywords={foundKeywords}
