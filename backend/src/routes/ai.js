@@ -147,14 +147,25 @@ router.post('/invoke', async (req, res) => {
         provider = providers[0];
       }
     }
-    const { client: aiClient } = getAIClient(provider);
-    const messages = [{ role: 'system', content: provider.custom_prompt || 'You are a helpful AI assistant for resume writing.' }, { role: 'user', content: prompt }];
+    // Use the callAI helper which supports both OpenAI and Gemini providers
+    const aiClientWrapper = getAIClient(provider);
+    const systemPrompt = provider.custom_prompt || 'You are a helpful AI assistant for resume writing.';
+    let userPrompt = prompt;
+
+    // Add JSON schema instruction if needed
     if (response_json_schema) {
-      messages[1].content += '\n\nRespond ONLY with valid JSON matching this schema:\n' + JSON.stringify(response_json_schema, null, 2);
+      userPrompt += '\n\nRespond ONLY with valid JSON matching this schema:\n' + JSON.stringify(response_json_schema, null, 2);
     }
-    const completion = await aiClient.chat.completions.create({ model: model, messages: messages, temperature: 0.7, max_tokens: 2000 });
-    const content = completion.choices[0].message.content;
+
+    const aiResponse = await callAI(aiClientWrapper, userPrompt, systemPrompt, model, {
+      temperature: 0.7,
+      max_tokens: 2000
+    });
+
+    const content = aiResponse.content;
     let result = content;
+
+    // Parse JSON if schema was provided
     if (response_json_schema) {
       try {
         const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -164,7 +175,8 @@ router.post('/invoke', async (req, res) => {
         result = { error: 'Failed to parse AI response', raw: content };
       }
     }
-    res.json({ result: result, provider: provider.name, model: model, usage: completion.usage });
+
+    res.json({ result: result, provider: provider.name, model: model, usage: aiResponse.usage });
   } catch (error) {
     console.error('AI invoke error:', error);
     res.status(500).json({ error: 'AI request failed', message: error.message });
@@ -179,9 +191,18 @@ router.post('/improve-summary', async (req, res) => {
     const results = [];
     for (const provider of providers) {
       try {
-        const { client: aiClient } = getAIClient(provider);
-        const completion = await aiClient.chat.completions.create({ model: 'gpt-4', messages: [{ role: 'system', content: 'You are an expert resume writer.' }, { role: 'user', content: prompt }], temperature: 0.7, max_tokens: 500 });
-        results.push({ provider_id: provider.id, provider_name: provider.name, improved_text: completion.choices[0].message.content.trim() });
+        // Use callAI helper which supports both OpenAI and Gemini providers
+        const aiClientWrapper = getAIClient(provider);
+        const systemPrompt = 'You are an expert resume writer.';
+        const aiResponse = await callAI(aiClientWrapper, prompt, systemPrompt, 'gpt-4', {
+          temperature: 0.7,
+          max_tokens: 500
+        });
+        results.push({
+          provider_id: provider.id,
+          provider_name: provider.name,
+          improved_text: aiResponse.content.trim()
+        });
       } catch (error) {
         console.error(`Provider ${provider.name} failed:`, error);
       }
@@ -215,12 +236,23 @@ router.post('/analyze-ats', async (req, res) => {
       }
       provider = providers[0];
     }
-    const { client: aiClient } = getAIClient(provider);
-    const completion = await aiClient.chat.completions.create({ model: 'gpt-4', messages: [{ role: 'system', content: 'You are an expert ATS system analyst.' }, { role: 'user', content: prompt }], temperature: 0.3, max_tokens: 1500 });
-    const content = completion.choices[0].message.content;
+    // Use callAI helper which supports both OpenAI and Gemini providers
+    const aiClientWrapper = getAIClient(provider);
+    const systemPrompt = 'You are an expert ATS system analyst.';
+    const aiResponse = await callAI(aiClientWrapper, prompt, systemPrompt, 'gpt-4', {
+      temperature: 0.3,
+      max_tokens: 1500
+    });
+
+    const content = aiResponse.content;
     const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const analysis = JSON.parse(cleaned);
-    res.json({ ...analysis, analyzed_at: new Date().toISOString(), analyzed_job_description: job_description, analyzed_resume_snapshot: resume_data });
+    res.json({
+      ...analysis,
+      analyzed_at: new Date().toISOString(),
+      analyzed_job_description: job_description,
+      analyzed_resume_snapshot: resume_data
+    });
   } catch (error) {
     console.error('ATS analysis error:', error);
     res.status(500).json({ error: 'Failed to analyze resume' });
