@@ -11,7 +11,15 @@ router.get('/by-resume/:resumeId', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Resume data not found' });
     }
-    res.json(result.rows[0]);
+
+    // Map database 'summary' field to frontend 'professional_summary'
+    const data = result.rows[0];
+    if (data.summary !== undefined) {
+      data.professional_summary = data.summary;
+      delete data.summary;
+    }
+
+    res.json(data);
   } catch (error) {
     console.error('Get resume data error:', error);
     res.status(500).json({ error: 'Failed to fetch resume data' });
@@ -100,7 +108,15 @@ router.post('/', async (req, res) => {
         req.user.id
       ]
     );
-    res.status(201).json(result.rows[0]);
+
+    // Map database 'summary' field to frontend 'professional_summary'
+    const data = result.rows[0];
+    if (data.summary !== undefined) {
+      data.professional_summary = data.summary;
+      delete data.summary;
+    }
+
+    res.status(201).json(data);
   } catch (error) {
     console.error('Create resume data error:', error);
     if (error.code === '23505') {
@@ -164,7 +180,15 @@ router.put('/:id', async (req, res) => {
     const values = Object.values(updates);
     const setClause = fields.map((field, i) => `${field} = $${i + 1}`).join(', ');
     const result = await query(`UPDATE resume_data SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`, [...values, req.params.id]);
-    res.json(result.rows[0]);
+
+    // Map database 'summary' field to frontend 'professional_summary'
+    const data = result.rows[0];
+    if (data.summary !== undefined) {
+      data.professional_summary = data.summary;
+      delete data.summary;
+    }
+
+    res.json(data);
   } catch (error) {
     console.error('Update resume data error:', error);
     res.status(500).json({ error: 'Failed to update resume data' });
