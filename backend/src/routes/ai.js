@@ -122,7 +122,7 @@ export async function callAI(aiClientWrapper, prompt, systemPrompt, modelName, o
 
 router.post('/invoke', async (req, res) => {
   try {
-    const { prompt, response_json_schema, provider_id, model = 'gpt-4' } = req.body;
+    const { prompt, response_json_schema, provider_id, model } = req.body;
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt is required' });
     }
@@ -157,7 +157,10 @@ router.post('/invoke', async (req, res) => {
       userPrompt += '\n\nRespond ONLY with valid JSON matching this schema:\n' + JSON.stringify(response_json_schema, null, 2);
     }
 
-    const aiResponse = await callAI(aiClientWrapper, userPrompt, systemPrompt, model, {
+    // Use model from: request body > provider config > default
+    const modelToUse = model || provider.model_name || 'gpt-4o-mini';
+
+    const aiResponse = await callAI(aiClientWrapper, userPrompt, systemPrompt, modelToUse, {
       temperature: 0.7,
       max_tokens: 2000
     });
@@ -194,7 +197,8 @@ router.post('/improve-summary', async (req, res) => {
         // Use callAI helper which supports both OpenAI and Gemini providers
         const aiClientWrapper = getAIClient(provider);
         const systemPrompt = 'You are an expert resume writer.';
-        const aiResponse = await callAI(aiClientWrapper, prompt, systemPrompt, 'gpt-4', {
+        const modelToUse = provider.model_name || 'gpt-4o-mini';
+        const aiResponse = await callAI(aiClientWrapper, prompt, systemPrompt, modelToUse, {
           temperature: 0.7,
           max_tokens: 500
         });
@@ -239,7 +243,8 @@ router.post('/analyze-ats', async (req, res) => {
     // Use callAI helper which supports both OpenAI and Gemini providers
     const aiClientWrapper = getAIClient(provider);
     const systemPrompt = 'You are an expert ATS system analyst.';
-    const aiResponse = await callAI(aiClientWrapper, prompt, systemPrompt, 'gpt-4', {
+    const modelToUse = provider.model_name || 'gpt-4o-mini';
+    const aiResponse = await callAI(aiClientWrapper, prompt, systemPrompt, modelToUse, {
       temperature: 0.3,
       max_tokens: 1500
     });
