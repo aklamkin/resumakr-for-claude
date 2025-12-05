@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Brain, Plus, Trash2, CheckCircle, AlertCircle, Loader2, Edit2, Power, X, Star } from "lucide-react";
+import { Brain, Plus, Trash2, CheckCircle, AlertCircle, Loader2, Edit2, Power, X, Star, FlaskConical } from "lucide-react";
 import { NotificationPopup, ConfirmDialog } from "../components/ui/notification";
 import { motion } from "framer-motion";
 
@@ -75,6 +75,8 @@ export default function SettingsProviders() {
   const [editData, setEditData] = useState({});
   const [openrouterModels, setOpenrouterModels] = useState([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [testResult, setTestResult] = useState(null); // {success: boolean, message: string}
+  const [testingProvider, setTestingProvider] = useState(false);
 
   React.useEffect(() => {
     api.auth.me().then(currentUser => {
@@ -187,6 +189,7 @@ export default function SettingsProviders() {
       order: providers.length + 1
     });
     setShowForm(false);
+    setTestResult(null);
   };
 
   const handleEdit = (provider) => {
@@ -200,6 +203,7 @@ export default function SettingsProviders() {
       is_default: provider.is_default || false,
       order: provider.order || 0
     });
+    setTestResult(null);
     // Fetch OpenRouter models if editing OpenRouter provider
     if (provider.provider_type === 'openrouter') {
       fetchOpenRouterModels();
@@ -209,6 +213,40 @@ export default function SettingsProviders() {
   const handleCancelEdit = () => {
     setEditingProviderId(null);
     setEditData({});
+    setTestResult(null);
+  };
+
+  const handleTestProvider = async (providerData) => {
+    if (!providerData.provider_type) {
+      showNotification("Please select a provider type.", "Missing Information", "error");
+      return;
+    }
+    if (!providerData.api_key?.trim()) {
+      showNotification("Please enter an API key to test.", "Missing Information", "error");
+      return;
+    }
+
+    setTestingProvider(true);
+    setTestResult(null);
+
+    try {
+      const result = await api.entities.AIProvider.test(providerData);
+      setTestResult({
+        success: true,
+        message: result.message || "Provider test successful!",
+        test_response: result.test_response
+      });
+      showNotification(result.message || "Provider test successful!", "Test Passed", "success");
+    } catch (error) {
+      const errorMsg = error.response?.data?.error || error.message || "Provider test failed";
+      setTestResult({
+        success: false,
+        message: errorMsg
+      });
+      showNotification(errorMsg, "Test Failed", "error");
+    } finally {
+      setTestingProvider(false);
+    }
   };
 
   const handleSaveEdit = (provider) => {
@@ -435,9 +473,45 @@ export default function SettingsProviders() {
                     </div>
                   )}
 
+                  {testResult && (
+                    <div className={`p-3 rounded-lg ${testResult.success ? 'bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800'}`}>
+                      <div className="flex items-center gap-2">
+                        {testResult.success ? (
+                          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                        )}
+                        <p className={`text-sm font-medium ${testResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                          {testResult.message}
+                        </p>
+                      </div>
+                      {testResult.test_response && (
+                        <p className="text-xs text-green-700 dark:text-green-300 mt-1 ml-7">Response: {testResult.test_response}</p>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
                     <Button variant="outline" onClick={resetForm} className="border-slate-300 dark:border-slate-600">
                       Cancel
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleTestProvider(newProvider)}
+                      disabled={testingProvider}
+                      className="border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-400"
+                    >
+                      {testingProvider ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        <>
+                          <FlaskConical className="w-4 h-4 mr-2" />
+                          Test Configuration
+                        </>
+                      )}
                     </Button>
                     <Button onClick={handleAddProvider} className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600">
                       Add Provider
@@ -580,6 +654,24 @@ export default function SettingsProviders() {
                             </div>
                           )}
 
+                          {testResult && (
+                            <div className={`p-3 rounded-lg ${testResult.success ? 'bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800'}`}>
+                              <div className="flex items-center gap-2">
+                                {testResult.success ? (
+                                  <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                                ) : (
+                                  <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                                )}
+                                <p className={`text-sm font-medium ${testResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                                  {testResult.message}
+                                </p>
+                              </div>
+                              {testResult.test_response && (
+                                <p className="text-xs text-green-700 dark:text-green-300 mt-1 ml-7">Response: {testResult.test_response}</p>
+                              )}
+                            </div>
+                          )}
+
                           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
                             <Button
                               variant="outline"
@@ -587,6 +679,27 @@ export default function SettingsProviders() {
                               className="border-slate-300 dark:border-slate-600"
                             >
                               Cancel
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => handleTestProvider({
+                                ...editData,
+                                api_key: editData.api_key || provider.api_key || provider.config?.api_key
+                              })}
+                              disabled={testingProvider}
+                              className="border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-400"
+                            >
+                              {testingProvider ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Testing...
+                                </>
+                              ) : (
+                                <>
+                                  <FlaskConical className="w-4 h-4 mr-2" />
+                                  Test Configuration
+                                </>
+                              )}
                             </Button>
                             <Button
                               onClick={() => handleSaveEdit(provider)}

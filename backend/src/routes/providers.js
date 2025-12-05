@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../config/database.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
+import { getAIClient, callAI } from './ai.js';
 
 const router = express.Router();
 
@@ -109,6 +110,59 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
   } catch (error) {
     console.error('Delete provider error:', error);
     res.status(500).json({ error: 'Failed to delete provider' });
+  }
+});
+
+router.post('/test', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { provider_type, api_key, model_name, api_endpoint, api_url, config } = req.body;
+
+    if (!provider_type) {
+      return res.status(400).json({ error: 'provider_type is required' });
+    }
+
+    // Build config object with api_key if provided
+    const configObj = config || {};
+    if (api_key) {
+      configObj.api_key = api_key;
+    }
+
+    // Create a temporary provider object for testing
+    const testProvider = {
+      provider_type,
+      api_key: api_key || configObj.api_key,
+      model_name: model_name || 'gpt-4o-mini',
+      api_endpoint: api_url || api_endpoint,
+      api_url: api_url,
+      config: configObj
+    };
+
+    if (!testProvider.api_key && !configObj.api_key) {
+      return res.status(400).json({ error: 'API key is required for testing' });
+    }
+
+    // Test the provider with a simple prompt
+    const aiClient = getAIClient(testProvider);
+    const modelToUse = testProvider.model_name;
+    const testPrompt = "Say 'hello' in one word.";
+    const systemPrompt = "You are a test assistant.";
+
+    const result = await callAI(aiClient, testPrompt, systemPrompt, modelToUse, {
+      temperature: 0.5,
+      max_tokens: 50
+    });
+
+    res.json({
+      success: true,
+      message: 'Provider configuration is valid',
+      test_response: result.content
+    });
+  } catch (error) {
+    console.error('Provider test error:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message || 'Provider test failed'
+    });
   }
 });
 

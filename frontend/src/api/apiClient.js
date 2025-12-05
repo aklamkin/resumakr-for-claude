@@ -158,6 +158,10 @@ export const api = {
       },
       async delete(id) {
         await client.delete(`/providers/${id}`);
+      },
+      async test(providerData) {
+        const { data } = await client.post('/providers/test', providerData);
+        return data;
       }
     },
     CustomPrompt: {
