@@ -300,6 +300,13 @@ export const api = {
       async ExtractDataFromUploadedFile(params) {
         const { data } = await client.post('/upload/extract', params);
         return data;
+      },
+      async analyzeATS(jobDescription, resumeData) {
+        const { data } = await client.post('/ai/analyze-ats', {
+          job_description: jobDescription,
+          resume_data: resumeData
+        });
+        return data;
       }
     }
   },

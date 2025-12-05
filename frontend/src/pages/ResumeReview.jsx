@@ -258,61 +258,14 @@ export default function ResumeReview() {
         education: resumeData.education || []
       };
 
-      const resumeText = `
-Professional Summary: ${resumeContent.professional_summary}
-
-Work Experience:
-${resumeContent.work_experience.map((exp) => `
-- ${exp.position} at ${exp.company}
-  ${exp.responsibilities?.join('\n  ') || ''}
-`).join('\n')}
-
-Skills:
-${resumeContent.skills.map((cat) => `${cat.category}: ${cat.items?.join(', ') || ''}`).join('\n')}
-
-Education:
-${resumeContent.education.map((edu) => `${edu.degree} in ${edu.field_of_study || 'N/A'} from ${edu.institution}`).join('\n')}
-      `.trim();
-
-      const prompt = `You are an expert ATS analyzer. Analyze this resume against the job description.
-
-Job Description:
-${currentJD}
-
-Resume Content:
-${resumeText}
-
-Return analysis in JSON format with: score (0-100), keywords_extracted_jd, keywords_found_resume, missing_keywords, and recommendations.`;
-
-      const atsSchema = {
-        type: "object",
-        properties: {
-          score: { type: "number" },
-          keywords_extracted_jd: { type: "array", items: { type: "string" } },
-          keywords_found_resume: { type: "array", items: { type: "string" } },
-          missing_keywords: { type: "array", items: { type: "string" } },
-          recommendations: { type: "array", items: { type: "string" } }
-        },
-        required: ["score", "keywords_extracted_jd", "keywords_found_resume", "missing_keywords", "recommendations"]
-      };
-
-      const response = await api.integrations.Core.InvokeLLM({
-        prompt: prompt,
-        response_json_schema: atsSchema
-      });
-
-      const analysisResults = {
-        ...response,
-        analyzed_at: new Date().toISOString(),
-        analyzed_job_description: currentJD,
-        analyzed_resume_snapshot: resumeContent
-      };
+      // Use the dedicated ATS analysis endpoint
+      const analysisResults = await api.integrations.Core.analyzeATS(currentJD, resumeContent);
 
       await api.entities.ResumeData.update(dataId, { ats_analysis_results: analysisResults });
       setResumeData((prev) => ({ ...prev, ats_analysis_results: analysisResults }));
 
       showNotification(
-        `ATS Score: ${response.score}/100. Found ${response.keywords_found_resume?.length || 0} matching keywords.`,
+        `ATS Score: ${analysisResults.score}/100. Found ${analysisResults.keywords_found_resume?.length || 0} matching keywords.`,
         "ATS Analysis Complete"
       );
     } catch (err) {
