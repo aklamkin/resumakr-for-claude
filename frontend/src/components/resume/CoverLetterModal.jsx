@@ -123,22 +123,26 @@ Return ONLY the body paragraphs, no salutation, no date, no closing signature.`;
         prompt: longPrompt,
       });
 
-      setShortVersion(shortResponse.trim());
-      setLongVersion(longResponse.trim());
+      // Extract result from response object
+      const shortText = (shortResponse.result || shortResponse).trim();
+      const longText = (longResponse.result || longResponse).trim();
+
+      setShortVersion(shortText);
+      setLongVersion(longText);
 
       // Save to database
       if (resumeData?.id) {
         await api.entities.ResumeData.update(resumeData.id, {
-          cover_letter_short: shortResponse.trim(),
-          cover_letter_long: longResponse.trim(),
+          cover_letter_short: shortText,
+          cover_letter_long: longText,
           cover_letter_template_id: currentTemplate.id
         });
-        
+
         // Update parent state
         if (onCoverLetterSaved) {
           onCoverLetterSaved({
-            cover_letter_short: shortResponse.trim(),
-            cover_letter_long: longResponse.trim(),
+            cover_letter_short: shortText,
+            cover_letter_long: longText,
             cover_letter_template_id: currentTemplate.id
           });
         }
