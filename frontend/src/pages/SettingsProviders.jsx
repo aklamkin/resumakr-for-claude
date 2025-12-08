@@ -64,13 +64,14 @@ const PROVIDER_PRESETS = {
   }
 };
 
-// Gemini models (curated list - Gemini API requires auth to fetch models)
+// Gemini models (curated list - v1beta API compatible models only)
 const GEMINI_MODELS = [
   { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+  { id: 'gemini-1.5-pro-latest', name: 'Gemini 1.5 Pro (Latest)' },
   { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+  { id: 'gemini-1.5-flash-latest', name: 'Gemini 1.5 Flash (Latest)' },
   { id: 'gemini-1.5-flash-8b', name: 'Gemini 1.5 Flash-8B' },
-  { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro' },
-  { id: 'gemini-pro', name: 'Gemini Pro (alias)' }
+  { id: 'gemini-1.5-flash-8b-latest', name: 'Gemini 1.5 Flash-8B (Latest)' }
 ];
 
 export default function SettingsProviders() {
