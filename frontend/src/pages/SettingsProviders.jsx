@@ -34,7 +34,7 @@ const PROVIDER_PRESETS = {
   },
   gemini: {
     name: "Google Gemini",
-    api_url: "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent",
+    api_url: "https://generativelanguage.googleapis.com",
     placeholder_key: "AIza..."
   },
   deepseek: {
@@ -63,6 +63,15 @@ const PROVIDER_PRESETS = {
     placeholder_key: "..."
   }
 };
+
+// Gemini models (curated list - Gemini API requires auth to fetch models)
+const GEMINI_MODELS = [
+  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+  { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+  { id: 'gemini-1.5-flash-8b', name: 'Gemini 1.5 Flash-8B' },
+  { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro' },
+  { id: 'gemini-pro', name: 'Gemini Pro (alias)' }
+];
 
 export default function SettingsProviders() {
   const queryClient = useQueryClient();
@@ -461,13 +470,34 @@ export default function SettingsProviders() {
                     </div>
                   )}
 
-                  {newProvider.provider_type !== 'openrouter' && (
+                  {newProvider.provider_type === 'gemini' && (
+                    <div className="space-y-2">
+                      <Label className="text-slate-900 dark:text-slate-200">Model</Label>
+                      <Select
+                        value={newProvider.model_name}
+                        onValueChange={(value) => setNewProvider({...newProvider, model_name: value})}
+                      >
+                        <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
+                          <SelectValue placeholder="Select a model..." />
+                        </SelectTrigger>
+                        <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 max-h-64">
+                          {GEMINI_MODELS.map((model) => (
+                            <SelectItem key={model.id} value={model.id} className="dark:hover:bg-slate-700">
+                              {model.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {newProvider.provider_type !== 'openrouter' && newProvider.provider_type !== 'gemini' && (
                     <div className="space-y-2">
                       <Label className="text-slate-900 dark:text-slate-200">Model Name (optional)</Label>
                       <Input
                         value={newProvider.model_name}
                         onChange={(e) => setNewProvider({...newProvider, model_name: e.target.value})}
-                        placeholder="e.g., gpt-4, claude-3, gemini-pro"
+                        placeholder="e.g., gpt-4, claude-3"
                         className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700"
                       />
                     </div>
@@ -642,13 +672,34 @@ export default function SettingsProviders() {
                             </div>
                           )}
 
-                          {editData.provider_type !== 'openrouter' && (
+                          {editData.provider_type === 'gemini' && (
+                            <div className="space-y-2">
+                              <Label className="text-slate-900 dark:text-slate-200">Model</Label>
+                              <Select
+                                value={editData.model_name}
+                                onValueChange={(value) => setEditData({...editData, model_name: value})}
+                              >
+                                <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
+                                  <SelectValue placeholder="Select a model..." />
+                                </SelectTrigger>
+                                <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 max-h-64">
+                                  {GEMINI_MODELS.map((model) => (
+                                    <SelectItem key={model.id} value={model.id} className="dark:hover:bg-slate-700">
+                                      {model.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
+                          {editData.provider_type !== 'openrouter' && editData.provider_type !== 'gemini' && (
                             <div className="space-y-2">
                               <Label className="text-slate-900 dark:text-slate-200">Model Name (optional)</Label>
                               <Input
                                 value={editData.model_name}
                                 onChange={(e) => setEditData({...editData, model_name: e.target.value})}
-                                placeholder="e.g., gpt-4, claude-3, gemini-pro"
+                                placeholder="e.g., gpt-4, claude-3"
                                 className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700"
                               />
                             </div>
