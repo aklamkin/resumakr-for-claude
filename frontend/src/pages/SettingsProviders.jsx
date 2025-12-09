@@ -99,8 +99,8 @@ export default function SettingsProviders() {
   };
 
   // Fetch OpenRouter models
-  const fetchOpenRouterModels = async () => {
-    if (openrouterModels.length > 0) return; // Already fetched
+  const fetchOpenRouterModels = async (force = false) => {
+    if (openrouterModels.length > 0 && !force) return; // Already fetched
     setLoadingModels(true);
     try {
       const response = await fetch('https://openrouter.ai/api/v1/models');
@@ -115,12 +115,12 @@ export default function SettingsProviders() {
   };
 
   // Fetch Gemini models
-  const fetchGeminiModels = async (apiKey) => {
+  const fetchGeminiModels = async (apiKey, force = false) => {
     if (!apiKey) {
       showNotification('Please enter a Gemini API key first', 'API Key Required', 'error');
       return;
     }
-    if (geminiModels.length > 0) return; // Already fetched
+    if (geminiModels.length > 0 && !force) return; // Already fetched
     setLoadingModels(true);
     try {
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
@@ -501,13 +501,27 @@ export default function SettingsProviders() {
 
                   {newProvider.provider_type === 'openrouter' && (
                     <div className="space-y-2">
-                      <Label className="text-slate-900 dark:text-slate-200">Model {loadingModels && <Loader2 className="w-3 h-3 inline animate-spin" />}</Label>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-slate-900 dark:text-slate-200">
+                          Model {loadingModels && <Loader2 className="w-3 h-3 inline animate-spin ml-1" />}
+                        </Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fetchOpenRouterModels(true)}
+                          disabled={loadingModels}
+                          className="h-7 text-xs"
+                        >
+                          {openrouterModels.length > 0 ? 'Refresh Models' : 'Load Models'}
+                        </Button>
+                      </div>
                       <Select
                         value={newProvider.model_name}
                         onValueChange={(value) => setNewProvider({...newProvider, model_name: value})}
                       >
                         <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
-                          <SelectValue placeholder="Select a model..." />
+                          <SelectValue placeholder={openrouterModels.length > 0 ? "Select a model..." : "Click 'Load Models' to fetch available models"} />
                         </SelectTrigger>
                         <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 max-h-64">
                           {openrouterModels.map((model) => (
@@ -530,7 +544,7 @@ export default function SettingsProviders() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => fetchGeminiModels(newProvider.api_key)}
+                          onClick={() => fetchGeminiModels(newProvider.api_key, true)}
                           disabled={!newProvider.api_key || loadingModels}
                           className="h-7 text-xs"
                         >
@@ -717,13 +731,27 @@ export default function SettingsProviders() {
 
                           {editData.provider_type === 'openrouter' && (
                             <div className="space-y-2">
-                              <Label className="text-slate-900 dark:text-slate-200">Model {loadingModels && <Loader2 className="w-3 h-3 inline animate-spin" />}</Label>
+                              <div className="flex items-center justify-between">
+                                <Label className="text-slate-900 dark:text-slate-200">
+                                  Model {loadingModels && <Loader2 className="w-3 h-3 inline animate-spin ml-1" />}
+                                </Label>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => fetchOpenRouterModels(true)}
+                                  disabled={loadingModels}
+                                  className="h-7 text-xs"
+                                >
+                                  {openrouterModels.length > 0 ? 'Refresh Models' : 'Load Models'}
+                                </Button>
+                              </div>
                               <Select
                                 value={editData.model_name}
                                 onValueChange={(value) => setEditData({...editData, model_name: value})}
                               >
                                 <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
-                                  <SelectValue placeholder="Select a model..." />
+                                  <SelectValue placeholder={openrouterModels.length > 0 ? "Select a model..." : "Click 'Load Models' to fetch available models"} />
                                 </SelectTrigger>
                                 <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 max-h-64">
                                   {openrouterModels.map((model) => (
@@ -746,7 +774,7 @@ export default function SettingsProviders() {
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => fetchGeminiModels(editData.api_key || editData.config?.api_key)}
+                                  onClick={() => fetchGeminiModels(editData.api_key || editData.config?.api_key, true)}
                                   disabled={(!editData.api_key && !editData.config?.api_key) || loadingModels}
                                   className="h-7 text-xs"
                                 >
