@@ -64,14 +64,15 @@ const PROVIDER_PRESETS = {
   }
 };
 
-// Gemini models (curated list - v1beta API compatible models only)
+// Gemini models (curated list - current stable models)
 const GEMINI_MODELS = [
-  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
-  { id: 'gemini-1.5-pro-latest', name: 'Gemini 1.5 Pro (Latest)' },
-  { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
-  { id: 'gemini-1.5-flash-latest', name: 'Gemini 1.5 Flash (Latest)' },
-  { id: 'gemini-1.5-flash-8b', name: 'Gemini 1.5 Flash-8B' },
-  { id: 'gemini-1.5-flash-8b-latest', name: 'Gemini 1.5 Flash-8B (Latest)' }
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Stable)' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Stable)' },
+  { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite (Stable)' },
+  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Latest)' },
+  { id: 'gemini-2.0-flash-001', name: 'Gemini 2.0 Flash (Stable)' },
+  { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite (Latest)' },
+  { id: 'gemini-2.0-flash-lite-001', name: 'Gemini 2.0 Flash Lite (Stable)' }
 ];
 
 export default function SettingsProviders() {
