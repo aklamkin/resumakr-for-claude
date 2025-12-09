@@ -64,15 +64,11 @@ const PROVIDER_PRESETS = {
   }
 };
 
-// Gemini models (curated list - current stable models)
-const GEMINI_MODELS = [
-  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Stable)' },
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Stable)' },
-  { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite (Stable)' },
-  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Latest)' },
-  { id: 'gemini-2.0-flash-001', name: 'Gemini 2.0 Flash (Stable)' },
-  { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite (Latest)' },
-  { id: 'gemini-2.0-flash-lite-001', name: 'Gemini 2.0 Flash Lite (Stable)' }
+// Gemini models - fallback list in case API fetch fails
+const GEMINI_MODELS_FALLBACK = [
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Recommended)' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+  { id: 'gemini-2.0-flash-001', name: 'Gemini 2.0 Flash (Stable)' }
 ];
 
 export default function SettingsProviders() {
@@ -85,6 +81,7 @@ export default function SettingsProviders() {
   const [deleteConfirmation, setDeleteConfirmation] = useState({ open: false, providerId: null, providerName: "" });
   const [editData, setEditData] = useState({});
   const [openrouterModels, setOpenrouterModels] = useState([]);
+  const [geminiModels, setGeminiModels] = useState([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [testResult, setTestResult] = useState(null); // {success: boolean, message: string}
   const [testingProvider, setTestingProvider] = useState(false);
@@ -113,6 +110,53 @@ export default function SettingsProviders() {
     } catch (error) {
       console.error('Failed to fetch OpenRouter models:', error);
       showNotification('Failed to load OpenRouter models', 'Error', 'error');
+    } finally {
+      setLoadingModels(false);
+    }
+  };
+
+  // Fetch Gemini models
+  const fetchGeminiModels = async (apiKey) => {
+    if (!apiKey) {
+      showNotification('Please enter a Gemini API key first', 'API Key Required', 'error');
+      return;
+    }
+    if (geminiModels.length > 0) return; // Already fetched
+    setLoadingModels(true);
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      const data = await response.json();
+
+      if (!data.models) {
+        console.error('No models returned from Gemini API');
+        setGeminiModels(GEMINI_MODELS_FALLBACK);
+        showNotification('Using fallback model list', 'Info', 'info');
+        return;
+      }
+
+      // Filter for models that support generateContent
+      const validModels = data.models
+        .filter(model => model.supportedGenerationMethods?.includes('generateContent'))
+        .map(model => {
+          // Extract model name (remove "models/" prefix)
+          const modelId = model.name.replace('models/', '');
+          return {
+            id: modelId,
+            name: model.displayName || modelId
+          };
+        })
+        .sort((a, b) => {
+          // Sort to put recommended models first
+          if (a.id.includes('2.5-flash')) return -1;
+          if (b.id.includes('2.5-flash')) return 1;
+          return a.name.localeCompare(b.name);
+        });
+
+      setGeminiModels(validModels.length > 0 ? validModels : GEMINI_MODELS_FALLBACK);
+    } catch (error) {
+      console.error('Failed to fetch Gemini models:', error);
+      setGeminiModels(GEMINI_MODELS_FALLBACK);
+      showNotification('Failed to load Gemini models, using fallback list', 'Error', 'error');
     } finally {
       setLoadingModels(false);
     }
@@ -474,16 +518,30 @@ export default function SettingsProviders() {
 
                   {newProvider.provider_type === 'gemini' && (
                     <div className="space-y-2">
-                      <Label className="text-slate-900 dark:text-slate-200">Model</Label>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-slate-900 dark:text-slate-200">
+                          Model {loadingModels && <Loader2 className="w-3 h-3 inline animate-spin ml-1" />}
+                        </Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fetchGeminiModels(newProvider.api_key)}
+                          disabled={!newProvider.api_key || loadingModels}
+                          className="h-7 text-xs"
+                        >
+                          {geminiModels.length > 0 ? 'Refresh Models' : 'Load Models'}
+                        </Button>
+                      </div>
                       <Select
                         value={newProvider.model_name}
                         onValueChange={(value) => setNewProvider({...newProvider, model_name: value})}
                       >
                         <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
-                          <SelectValue placeholder="Select a model..." />
+                          <SelectValue placeholder={geminiModels.length > 0 ? "Select a model..." : "Enter API key and click 'Load Models'"} />
                         </SelectTrigger>
                         <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 max-h-64">
-                          {GEMINI_MODELS.map((model) => (
+                          {(geminiModels.length > 0 ? geminiModels : GEMINI_MODELS_FALLBACK).map((model) => (
                             <SelectItem key={model.id} value={model.id} className="dark:hover:bg-slate-700">
                               {model.name}
                             </SelectItem>
@@ -676,16 +734,30 @@ export default function SettingsProviders() {
 
                           {editData.provider_type === 'gemini' && (
                             <div className="space-y-2">
-                              <Label className="text-slate-900 dark:text-slate-200">Model</Label>
+                              <div className="flex items-center justify-between">
+                                <Label className="text-slate-900 dark:text-slate-200">
+                                  Model {loadingModels && <Loader2 className="w-3 h-3 inline animate-spin ml-1" />}
+                                </Label>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => fetchGeminiModels(editData.api_key || editData.config?.api_key)}
+                                  disabled={(!editData.api_key && !editData.config?.api_key) || loadingModels}
+                                  className="h-7 text-xs"
+                                >
+                                  {geminiModels.length > 0 ? 'Refresh Models' : 'Load Models'}
+                                </Button>
+                              </div>
                               <Select
                                 value={editData.model_name}
                                 onValueChange={(value) => setEditData({...editData, model_name: value})}
                               >
                                 <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
-                                  <SelectValue placeholder="Select a model..." />
+                                  <SelectValue placeholder={geminiModels.length > 0 ? "Select a model..." : "Click 'Load Models' to fetch available models"} />
                                 </SelectTrigger>
                                 <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 max-h-64">
-                                  {GEMINI_MODELS.map((model) => (
+                                  {(geminiModels.length > 0 ? geminiModels : GEMINI_MODELS_FALLBACK).map((model) => (
                                     <SelectItem key={model.id} value={model.id} className="dark:hover:bg-slate-700">
                                       {model.name}
                                     </SelectItem>
