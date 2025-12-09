@@ -64,11 +64,10 @@ const PROVIDER_PRESETS = {
   }
 };
 
-// Gemini models - fallback list in case API fetch fails
+// Gemini models - fallback list (free tier compatible only)
 const GEMINI_MODELS_FALLBACK = [
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Recommended)' },
-  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-  { id: 'gemini-2.0-flash-001', name: 'Gemini 2.0 Flash (Stable)' }
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Free Tier)' },
+  { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite (Free Tier)' }
 ];
 
 export default function SettingsProviders() {
