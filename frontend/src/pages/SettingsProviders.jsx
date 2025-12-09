@@ -255,12 +255,17 @@ export default function SettingsProviders() {
       api_key: "", // Leave empty, will only update if user enters new value
       model_name: provider.model_name || "",
       is_default: provider.is_default || false,
-      order: provider.order || 0
+      order: provider.order || 0,
+      config: provider.config || {} // Include config to access saved api_key
     });
     setTestResult(null);
     // Fetch OpenRouter models if editing OpenRouter provider
     if (provider.provider_type === 'openrouter') {
       fetchOpenRouterModels();
+    }
+    // Fetch Gemini models if editing Gemini provider and API key exists
+    if (provider.provider_type === 'gemini' && provider.config?.api_key) {
+      fetchGeminiModels(provider.config.api_key);
     }
   };
 
