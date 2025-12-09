@@ -499,29 +499,49 @@ export default function SettingsProviders() {
                     />
                   </div>
 
-                  {newProvider.provider_type === 'openrouter' && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-slate-900 dark:text-slate-200">
-                          Model {loadingModels && <Loader2 className="w-3 h-3 inline animate-spin ml-1" />}
-                        </Label>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => fetchOpenRouterModels(true)}
-                          disabled={loadingModels}
-                          className="h-7 text-xs"
-                        >
-                          {openrouterModels.length > 0 ? 'Refresh Models' : 'Load Models'}
-                        </Button>
-                      </div>
+                  {/* Unified Model Selection for ALL Providers */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-slate-900 dark:text-slate-200">
+                        Model {loadingModels && <Loader2 className="w-3 h-3 inline animate-spin ml-1" />}
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (newProvider.provider_type === 'openrouter') {
+                            fetchOpenRouterModels(true);
+                          } else if (newProvider.provider_type === 'gemini') {
+                            fetchGeminiModels(newProvider.api_key, true);
+                          }
+                        }}
+                        disabled={
+                          loadingModels ||
+                          (newProvider.provider_type !== 'openrouter' && newProvider.provider_type !== 'gemini') ||
+                          (newProvider.provider_type === 'gemini' && !newProvider.api_key)
+                        }
+                        className="h-7 text-xs"
+                        title={
+                          newProvider.provider_type !== 'openrouter' && newProvider.provider_type !== 'gemini'
+                            ? 'Dynamic model list not available for this provider'
+                            : ''
+                        }
+                      >
+                        {newProvider.provider_type === 'openrouter' && openrouterModels.length > 0 ? 'Refresh Models' :
+                         newProvider.provider_type === 'gemini' && geminiModels.length > 0 ? 'Refresh Models' :
+                         'Load Models'}
+                      </Button>
+                    </div>
+
+                    {/* Show Select for providers with model lists, Input for others */}
+                    {newProvider.provider_type === 'openrouter' && openrouterModels.length > 0 ? (
                       <Select
                         value={newProvider.model_name}
                         onValueChange={(value) => setNewProvider({...newProvider, model_name: value})}
                       >
                         <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
-                          <SelectValue placeholder={openrouterModels.length > 0 ? "Select a model..." : "Click 'Load Models' to fetch available models"} />
+                          <SelectValue placeholder="Select a model..." />
                         </SelectTrigger>
                         <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 max-h-64">
                           {openrouterModels.map((model) => (
@@ -531,55 +551,35 @@ export default function SettingsProviders() {
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
-                  )}
-
-                  {newProvider.provider_type === 'gemini' && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-slate-900 dark:text-slate-200">
-                          Model {loadingModels && <Loader2 className="w-3 h-3 inline animate-spin ml-1" />}
-                        </Label>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => fetchGeminiModels(newProvider.api_key, true)}
-                          disabled={!newProvider.api_key || loadingModels}
-                          className="h-7 text-xs"
-                        >
-                          {geminiModels.length > 0 ? 'Refresh Models' : 'Load Models'}
-                        </Button>
-                      </div>
+                    ) : newProvider.provider_type === 'gemini' && geminiModels.length > 0 ? (
                       <Select
                         value={newProvider.model_name}
                         onValueChange={(value) => setNewProvider({...newProvider, model_name: value})}
                       >
                         <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
-                          <SelectValue placeholder={geminiModels.length > 0 ? "Select a model..." : "Enter API key and click 'Load Models'"} />
+                          <SelectValue placeholder="Select a model..." />
                         </SelectTrigger>
                         <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 max-h-64">
-                          {(geminiModels.length > 0 ? geminiModels : GEMINI_MODELS_FALLBACK).map((model) => (
+                          {geminiModels.map((model) => (
                             <SelectItem key={model.id} value={model.id} className="dark:hover:bg-slate-700">
                               {model.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
-                  )}
-
-                  {newProvider.provider_type !== 'openrouter' && newProvider.provider_type !== 'gemini' && (
-                    <div className="space-y-2">
-                      <Label className="text-slate-900 dark:text-slate-200">Model Name (optional)</Label>
+                    ) : (
                       <Input
                         value={newProvider.model_name}
                         onChange={(e) => setNewProvider({...newProvider, model_name: e.target.value})}
-                        placeholder="e.g., gpt-4, claude-3"
+                        placeholder={
+                          newProvider.provider_type === 'openrouter' ? "Click 'Load Models' to fetch available models" :
+                          newProvider.provider_type === 'gemini' ? "Enter API key and click 'Load Models'" :
+                          "e.g., gpt-4o, claude-3-5-sonnet"
+                        }
                         className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700"
                       />
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {testResult && (
                     <div className={`p-3 rounded-lg ${testResult.success ? 'bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800'}`}>
@@ -729,29 +729,49 @@ export default function SettingsProviders() {
                             />
                           </div>
 
-                          {editData.provider_type === 'openrouter' && (
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-slate-900 dark:text-slate-200">
-                                  Model {loadingModels && <Loader2 className="w-3 h-3 inline animate-spin ml-1" />}
-                                </Label>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => fetchOpenRouterModels(true)}
-                                  disabled={loadingModels}
-                                  className="h-7 text-xs"
-                                >
-                                  {openrouterModels.length > 0 ? 'Refresh Models' : 'Load Models'}
-                                </Button>
-                              </div>
+                          {/* Unified Model Selection for ALL Providers */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-slate-900 dark:text-slate-200">
+                                Model {loadingModels && <Loader2 className="w-3 h-3 inline animate-spin ml-1" />}
+                              </Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (editData.provider_type === 'openrouter') {
+                                    fetchOpenRouterModels(true);
+                                  } else if (editData.provider_type === 'gemini') {
+                                    fetchGeminiModels(editData.api_key || editData.config?.api_key, true);
+                                  }
+                                }}
+                                disabled={
+                                  loadingModels ||
+                                  (editData.provider_type !== 'openrouter' && editData.provider_type !== 'gemini') ||
+                                  (editData.provider_type === 'gemini' && !editData.api_key && !editData.config?.api_key)
+                                }
+                                className="h-7 text-xs"
+                                title={
+                                  editData.provider_type !== 'openrouter' && editData.provider_type !== 'gemini'
+                                    ? 'Dynamic model list not available for this provider'
+                                    : ''
+                                }
+                              >
+                                {editData.provider_type === 'openrouter' && openrouterModels.length > 0 ? 'Refresh Models' :
+                                 editData.provider_type === 'gemini' && geminiModels.length > 0 ? 'Refresh Models' :
+                                 'Load Models'}
+                              </Button>
+                            </div>
+
+                            {/* Show Select for providers with model lists, Input for others */}
+                            {editData.provider_type === 'openrouter' && openrouterModels.length > 0 ? (
                               <Select
                                 value={editData.model_name}
                                 onValueChange={(value) => setEditData({...editData, model_name: value})}
                               >
                                 <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
-                                  <SelectValue placeholder={openrouterModels.length > 0 ? "Select a model..." : "Click 'Load Models' to fetch available models"} />
+                                  <SelectValue placeholder="Select a model..." />
                                 </SelectTrigger>
                                 <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 max-h-64">
                                   {openrouterModels.map((model) => (
@@ -761,55 +781,35 @@ export default function SettingsProviders() {
                                   ))}
                                 </SelectContent>
                               </Select>
-                            </div>
-                          )}
-
-                          {editData.provider_type === 'gemini' && (
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-slate-900 dark:text-slate-200">
-                                  Model {loadingModels && <Loader2 className="w-3 h-3 inline animate-spin ml-1" />}
-                                </Label>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => fetchGeminiModels(editData.api_key || editData.config?.api_key, true)}
-                                  disabled={(!editData.api_key && !editData.config?.api_key) || loadingModels}
-                                  className="h-7 text-xs"
-                                >
-                                  {geminiModels.length > 0 ? 'Refresh Models' : 'Load Models'}
-                                </Button>
-                              </div>
+                            ) : editData.provider_type === 'gemini' && geminiModels.length > 0 ? (
                               <Select
                                 value={editData.model_name}
                                 onValueChange={(value) => setEditData({...editData, model_name: value})}
                               >
                                 <SelectTrigger className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
-                                  <SelectValue placeholder={geminiModels.length > 0 ? "Select a model..." : "Click 'Load Models' to fetch available models"} />
+                                  <SelectValue placeholder="Select a model..." />
                                 </SelectTrigger>
                                 <SelectContent className="dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 max-h-64">
-                                  {(geminiModels.length > 0 ? geminiModels : GEMINI_MODELS_FALLBACK).map((model) => (
+                                  {geminiModels.map((model) => (
                                     <SelectItem key={model.id} value={model.id} className="dark:hover:bg-slate-700">
                                       {model.name}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
-                            </div>
-                          )}
-
-                          {editData.provider_type !== 'openrouter' && editData.provider_type !== 'gemini' && (
-                            <div className="space-y-2">
-                              <Label className="text-slate-900 dark:text-slate-200">Model Name (optional)</Label>
+                            ) : (
                               <Input
                                 value={editData.model_name}
                                 onChange={(e) => setEditData({...editData, model_name: e.target.value})}
-                                placeholder="e.g., gpt-4, claude-3"
+                                placeholder={
+                                  editData.provider_type === 'openrouter' ? "Click 'Load Models' to fetch available models" :
+                                  editData.provider_type === 'gemini' ? "Click 'Load Models' to fetch available models" :
+                                  "e.g., gpt-4o, claude-3-5-sonnet"
+                                }
                                 className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700"
                               />
-                            </div>
-                          )}
+                            )}
+                          </div>
 
                           {testResult && (
                             <div className={`p-3 rounded-lg ${testResult.success ? 'bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800'}`}>
