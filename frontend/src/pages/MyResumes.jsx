@@ -127,8 +127,8 @@ export default function MyResumes() {
     mutationFn: async (resumeId) => {
       setDuplicatingId(resumeId);
       const originalResume = resumes.find(r => r.id === resumeId);
-      const dataRecords = await api.entities.ResumeData.filter({ resume_id: resumeId });
-      
+      const resumeDataRecord = await api.entities.ResumeData.getByResumeId(resumeId);
+
       const newResume = await api.entities.Resume.create({
         title: `Copy of ${originalResume.title}`,
         status: originalResume.status,
@@ -138,15 +138,14 @@ export default function MyResumes() {
       });
 
       // Always create a ResumeData record, even if original has none
-      if (dataRecords.length > 0) {
-        const originalData = dataRecords[0];
-        const { 
-          id, created_date, updated_date, created_by, resume_id, 
+      if (resumeDataRecord) {
+        const {
+          id, created_date, updated_date, created_by, resume_id,
           job_description, ats_analysis_results,
-          cover_letter_short, cover_letter_long, cover_letter_template_id, 
+          cover_letter_short, cover_letter_long, cover_letter_template_id,
           cover_letter_custom_colors, cover_letter_custom_fonts,
-          ...dataToCopy 
-        } = originalData;
+          ...dataToCopy
+        } = resumeDataRecord;
         await api.entities.ResumeData.create({
           resume_id: newResume.id,
           job_description: "",
@@ -169,15 +168,8 @@ export default function MyResumes() {
         });
       }
 
-      const versionRecords = await api.entities.ResumeVersion.filter({ resume_id: resumeId });
-      for (const version of versionRecords) {
-        const { id, created_date, updated_date, created_by, resume_id, ...versionToCopy } = version;
-        await api.entities.ResumeVersion.create({
-          resume_id: newResume.id,
-          version_name: version.version_name || `Version ${version.version_number}`,
-          ...versionToCopy
-        });
-      }
+      // Do NOT copy versions - duplicated resume should start fresh
+      // (Removed version copying logic per requirements)
 
       return newResume;
     },
@@ -196,17 +188,26 @@ export default function MyResumes() {
   const deleteResumeMutation = useMutation({
     mutationFn: async (resumeId) => {
       setDeletingId(resumeId);
-      await api.entities.Resume.delete(resumeId);
-      
-      const dataRecords = await api.entities.ResumeData.filter({ resume_id: resumeId });
-      for (const record of dataRecords) {
-        await api.entities.ResumeData.delete(record.id);
+
+      // Delete associated ResumeData
+      try {
+        const resumeDataRecord = await api.entities.ResumeData.getByResumeId(resumeId);
+        if (resumeDataRecord) {
+          await api.entities.ResumeData.delete(resumeDataRecord.id);
+        }
+      } catch (err) {
+        // ResumeData might not exist, continue
+        console.log('No ResumeData to delete or error deleting:', err);
       }
-      
+
+      // Delete associated versions
       const versionRecords = await api.entities.ResumeVersion.filter({ resume_id: resumeId });
       for (const record of versionRecords) {
         await api.entities.ResumeVersion.delete(record.id);
       }
+
+      // Delete the resume itself
+      await api.entities.Resume.delete(resumeId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-resumes'] });
@@ -750,18 +751,16 @@ export default function MyResumes() {
 
   const handleExportFormat = async (resumeId, formatId) => {
     setExportingId(resumeId);
-    
+
     try {
       const resume = resumes.find(r => r.id === resumeId);
-      const dataRecords = await api.entities.ResumeData.filter({ resume_id: resumeId });
-      
-      if (dataRecords.length === 0) {
+      const resumeData = await api.entities.ResumeData.getByResumeId(resumeId);
+
+      if (!resumeData) {
         showNotification("No resume data found to export", "Error", "error");
         setExportingId(null);
         return;
       }
-
-      const resumeData = dataRecords[0];
       const personalInfo = resumeData.personal_info || {};
       
       // Create file name using pattern: {UserName}_Resume

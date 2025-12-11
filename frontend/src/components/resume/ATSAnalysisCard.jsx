@@ -30,27 +30,17 @@ export default function ATSAnalysisCard({
   onToggleResults,
   isSubscribed = true
 }) {
-  const [isLocked, setIsLocked] = useState(false);
-  
   const hasResults = atsResults && atsResults.score !== undefined;
   const score = hasResults ? atsResults.score : 0;
 
-  // Check if job description is already locked (has content on mount)
-  useEffect(() => {
-    if (jobDescription && jobDescription.trim()) {
-      setIsLocked(true);
-    }
-  }, []);
+  // Button is disabled only if analysis has results for the CURRENT job description
+  const isAnalysisComplete = hasResults &&
+    jobDescription &&
+    jobDescription.trim() &&
+    atsResults.analyzed_job_description === jobDescription.trim();
 
-  const handlePaste = (e) => {
-    // Wait for paste to complete, then check if there's actual text content
-    setTimeout(() => {
-      const textarea = e.target;
-      if (textarea.value && textarea.value.trim()) {
-        setIsLocked(true);
-      }
-    }, 0);
-  };
+  // Lock the job description if analysis is complete
+  const isLocked = isAnalysisComplete;
 
   const getScoreColor = (score) => {
     if (score >= 80) return "text-green-600 dark:text-green-500";
@@ -69,12 +59,6 @@ export default function ATSAnalysisCard({
     if (score >= 60) return "Good, but room for improvement";
     return "Needs significant optimization";
   };
-
-  // Button is disabled only if analysis has results for the CURRENT job description
-  const isAnalysisComplete = hasResults && 
-    jobDescription && 
-    jobDescription.trim() && 
-    atsResults.analyzed_job_description === jobDescription.trim();
 
   return (
     <Card className="p-6 border-2 border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/50">
