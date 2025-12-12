@@ -302,7 +302,7 @@ export default function MyResumes() {
     @page {
       size: letter;
       margin: 0.75in;
-      
+
       @bottom-center {
         content: counter(page);
         font-family: 'Calibri', 'Arial', sans-serif;
@@ -310,113 +310,142 @@ export default function MyResumes() {
         color: #666;
       }
     }
-    
+
     body {
       font-family: 'Calibri', 'Arial', sans-serif;
       line-height: 1.6;
       color: #333;
       font-size: 11pt;
     }
-    
+
     h1 {
       font-size: 24pt;
       margin-bottom: 8px;
       color: #1a1a1a;
       font-weight: 700;
+      page-break-after: avoid;
     }
-    
+
     h2 {
       font-size: 14pt;
-      margin-top: 18px;
+      margin-top: 16px;
       margin-bottom: 10px;
       padding-bottom: 4px;
       border-bottom: 2px solid #333;
       color: #1a1a1a;
       font-weight: 600;
+      page-break-after: avoid;
+      page-break-before: auto;
     }
-    
+
     h3 {
       font-size: 12pt;
       margin-bottom: 4px;
       color: #1a1a1a;
       font-weight: 600;
+      page-break-after: avoid;
     }
-    
+
     .contact-info {
       font-size: 10pt;
-      margin-bottom: 18px;
+      margin-bottom: 16px;
       color: #555;
       line-height: 1.4;
+      page-break-after: avoid;
     }
-    
+
     .section {
-      margin-bottom: 18px;
-      page-break-inside: avoid;
+      margin-bottom: 14px;
+      break-inside: avoid-page;
+      page-break-inside: auto;
     }
-    
+
+    .section:first-of-type {
+      page-break-after: auto;
+    }
+
     .job-header, .edu-header {
       display: flex;
       justify-content: space-between;
       margin-bottom: 6px;
       page-break-inside: avoid;
+      page-break-after: avoid;
     }
-    
+
     .company {
       font-weight: 600;
       font-size: 10pt;
     }
-    
+
     .date {
       font-style: italic;
       color: #555;
       font-size: 10pt;
       text-align: right;
     }
-    
+
     ul {
-      margin: 6px 0 12px 0;
+      margin: 6px 0 10px 0;
       padding-left: 24px;
     }
-    
+
     li {
-      margin-bottom: 4px;
+      margin-bottom: 3px;
       font-size: 10pt;
       line-height: 1.5;
     }
-    
+
     .skills {
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       page-break-inside: avoid;
     }
-    
+
     .skill-category {
       font-weight: 600;
       margin-right: 6px;
       font-size: 10pt;
     }
-    
+
     p {
       font-size: 10pt;
       line-height: 1.5;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
-    
+
     @media print {
-      body {
+      html, body {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+        height: auto;
       }
-      
+
+      h1, h2, h3 {
+        page-break-after: avoid;
+        orphans: 3;
+        widows: 3;
+      }
+
+      .contact-info {
+        page-break-after: avoid;
+      }
+
       .section {
-        page-break-inside: avoid;
+        page-break-inside: auto;
+        orphans: 2;
+        widows: 2;
       }
-      
-      h2 {
-        page-break-after: avoid;
-      }
-      
+
       .job-header, .edu-header {
+        page-break-inside: avoid;
         page-break-after: avoid;
+      }
+
+      ul, ol {
+        page-break-before: avoid;
+      }
+
+      li {
+        page-break-inside: avoid;
       }
     }
   </style>
