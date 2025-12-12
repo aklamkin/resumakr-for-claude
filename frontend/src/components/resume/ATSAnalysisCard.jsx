@@ -105,7 +105,6 @@ export default function ATSAnalysisCard({
           value={jobDescription}
           onChange={onJobDescriptionChange}
           onBlur={onJobDescriptionBlur}
-          onPaste={handlePaste}
           readOnly={isLocked}
           placeholder="Paste job description here..."
           className={`min-h-32 bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 dark:placeholder-slate-500 mb-4 ${
