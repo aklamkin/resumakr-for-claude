@@ -1,8 +1,10 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import passport from 'passport';
 import { query } from '../config/database.js';
 import { authenticate } from '../middleware/auth.js';
+import { generateOAuthToken } from '../config/passport.js';
 
 const router = express.Router();
 
@@ -110,8 +112,6 @@ router.get('/check', authenticate, (req, res) => {
   res.json({ authenticated: true });
 });
 
-export default router;
-
 router.post('/change-password', authenticate, async (req, res) => {
   try {
     const { current_password, new_password } = req.body;
@@ -150,3 +150,59 @@ router.post('/change-password', authenticate, async (req, res) => {
     res.status(500).json({ error: 'Failed to change password' });
   }
 });
+
+// ====================================
+// OAuth Routes
+// ====================================
+
+// Google OAuth - Initiate
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+// Google OAuth - Callback
+router.get(
+  '/google/callback',
+  passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=oauth_failed` }),
+  (req, res) => {
+    const token = generateOAuthToken(req.user);
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/callback?token=${token}`);
+  }
+);
+
+// Microsoft OAuth - Initiate
+router.get('/microsoft', passport.authenticate('microsoft', { scope: ['user.read'] }));
+
+// Microsoft OAuth - Callback
+router.get(
+  '/microsoft/callback',
+  passport.authenticate('microsoft', { failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=oauth_failed` }),
+  (req, res) => {
+    const token = generateOAuthToken(req.user);
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/callback?token=${token}`);
+  }
+);
+
+// GitHub OAuth - Initiate
+router.get('/github', passport.authenticate('github', { scope: ['user:email'] }));
+
+// GitHub OAuth - Callback
+router.get(
+  '/github/callback',
+  passport.authenticate('github', { failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=oauth_failed` }),
+  (req, res) => {
+    const token = generateOAuthToken(req.user);
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/callback?token=${token}`);
+  }
+);
+
+// Apple OAuth - Initiate
+router.get('/apple', passport.authenticate('apple', { scope: ['name', 'email'] }));
+
+// Apple OAuth - Callback
+router.post(
+  '/apple/callback',
+  passport.authenticate('apple', { failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=oauth_failed` }),
+  (req, res) => {
+    const token = generateOAuthToken(req.user);
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/callback?token=${token}`);
+  }
+);

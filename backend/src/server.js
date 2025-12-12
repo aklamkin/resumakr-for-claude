@@ -4,9 +4,11 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
+import session from 'express-session';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import passport from './config/passport.js';
 
 import authRoutes from './routes/auth.js';
 import resumeRoutes from './routes/resumes.js';
@@ -61,6 +63,24 @@ app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(compression());
+
+// Configure session for OAuth
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || process.env.JWT_SECRET || 'fallback-secret-change-in-production',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+  })
+);
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
 
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));

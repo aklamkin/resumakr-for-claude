@@ -3,6 +3,7 @@ import Layout from "./Layout.jsx";
 import Home from "./Home";
 import Login from "./Login";
 import Signup from "./Signup";
+import AuthCallback from "./AuthCallback";
 import UploadResume from "./UploadResume";
 import BuildWizard from "./BuildWizard";
 import ResumeReview from "./ResumeReview";
@@ -66,11 +67,12 @@ function PagesContent() {
     const isPublicPage = PUBLIC_PAGES.includes(currentPage) || location.pathname === '/login' || location.pathname === '/signup';
     
     // Auth pages don't use Layout
-    if (location.pathname === '/login' || location.pathname === '/signup') {
+    if (location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/auth/callback') {
         return (
             <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
             </Routes>
         );
     }
