@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
 import api from '@/api/apiClient';
 
 export default function Login() {
@@ -11,7 +10,6 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,17 +17,9 @@ export default function Login() {
 
     try {
       await api.auth.login(email, password);
-      toast({
-        title: 'Success',
-        description: 'Logged in successfully',
-      });
       navigate('/');
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Login failed',
-        variant: 'destructive',
-      });
+      console.error('Login failed:', error.response?.data?.error || 'Login failed');
     } finally {
       setLoading(false);
     }

@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
 import api from '@/api/apiClient';
 
 export default function Signup() {
@@ -12,7 +11,6 @@ export default function Signup() {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,17 +18,9 @@ export default function Signup() {
 
     try {
       await api.auth.register(email, password, fullName);
-      toast({
-        title: 'Success',
-        description: 'Account created successfully',
-      });
       navigate('/');
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Registration failed',
-        variant: 'destructive',
-      });
+      console.error('Registration failed:', error.response?.data?.error || 'Registration failed');
     } finally {
       setLoading(false);
     }

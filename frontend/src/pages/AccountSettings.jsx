@@ -5,11 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/components/ui/use-toast';
 import { User, Lock, Shield } from 'lucide-react';
 
 export default function AccountSettings() {
-  const { toast } = useToast();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -22,44 +20,27 @@ export default function AccountSettings() {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    
+
     if (newPassword !== confirmPassword) {
-      toast({
-        title: 'Error',
-        description: 'New passwords do not match',
-        variant: 'destructive',
-      });
+      console.error('New passwords do not match');
       return;
     }
-    
+
     if (newPassword.length < 8) {
-      toast({
-        title: 'Error',
-        description: 'Password must be at least 8 characters',
-        variant: 'destructive',
-      });
+      console.error('Password must be at least 8 characters');
       return;
     }
-    
+
     setChanging(true);
     try {
       await api.auth.changePassword(currentPassword, newPassword);
-      
-      toast({
-        title: 'Success',
-        description: 'Password changed successfully',
-      });
-      
+
       // Clear form
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to change password',
-        variant: 'destructive',
-      });
+      console.error('Failed to change password:', error.response?.data?.error || 'Failed to change password');
     } finally {
       setChanging(false);
     }
