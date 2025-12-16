@@ -110,21 +110,21 @@ export default function Pricing() {
 
   const handleValidateCoupon = async () => {
     if (!couponCode.trim()) return;
-    
+
     setValidatingCoupon(true);
     setCouponError("");
-    
+
     try {
-      const response = await api.functions.invoke('validateCoupon', {
-        coupon_code: couponCode.trim(),
-        plan_id: selectedPlan
-      });
-      
-      if (response.data.valid) {
-        setAppliedCoupon(response.data.coupon);
+      const response = await api.functions.validateCoupon(
+        couponCode.trim(),
+        selectedPlan
+      );
+
+      if (response.valid) {
+        setAppliedCoupon(response.coupon);
         setCouponError("");
       } else {
-        setCouponError(response.data.error || "Invalid coupon code");
+        setCouponError(response.error || "Invalid coupon code");
         setAppliedCoupon(null);
       }
     } catch (error) {
