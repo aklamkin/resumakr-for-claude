@@ -42,49 +42,8 @@ IMPORTANT: Try to naturally incorporate these keywords where genuinely applicabl
         : '';
 
       const systemPrompt = isSkillsSection
-        ? `You are a professional resume writer. Refine resume skills following these STRICT rules:
-
-      CRITICAL REQUIREMENTS:
-      1. NEVER add new skills not in the original list
-      2. NEVER make up or hallucinate skills
-      3. ONLY refine the wording/naming of existing skills to be more professional/industry-standard
-      4. NEVER add duplicates - each skill must be unique
-      5. Keep skills specific and technical - NO broad/generic terms like "communication" or "teamwork"
-      6. OUTPUT MUST BE ROUGHLY THE SAME LENGTH as input (±20%) - no significantly larger or smaller lists
-      7. Return skills separated ONLY by pipe character (|)
-      8. Return ONLY the pipe-separated list with NO explanations, NO numbering, NO bullets
-
-      CONTEXT AWARENESS:
-      - Consider the SPECIFIC skill category you're refining (e.g., "Programming Languages" vs "Cloud Platforms")
-      - If ATS keywords are provided, ONLY add those that are DIRECTLY RELEVANT to this specific skill category
-      - Do NOT dump all ATS keywords into every category indiscriminately
-      - Maintain the technical specificity of the original list
-
-      EXAMPLES OF GOOD REFINEMENT:
-      - "react js" → "React.js"
-      - "python programming" → "Python"
-      - "aws cloud" → "Amazon Web Services (AWS)"
-
-      EXAMPLES OF BAD REFINEMENT (DO NOT DO THIS):
-      - Adding "Communication" when it wasn't there
-      - Changing "React.js" to "Frontend Development" (too broad)
-      - Duplicating skills with different wording
-      - Adding 10 new skills when original had 5
-      - Adding cloud keywords to "Programming Languages" category
-
-      ${hasMissingKeywords ? '\nATS KEYWORDS (only add if DIRECTLY relevant to THIS category): ' + atsResults.missing_keywords.join(' | ') : ''}
-
-      ${resumeData?.job_description ? `Job Description:\n${resumeData.job_description}\n\n` : ''}${atsContext}`
-        : `You are a professional resume writer. Improve resume content while:
-        1. NEVER making up information - this is critical
-        2. Only improving language and presentation of EXISTING information
-        3. Keeping all facts exactly as provided
-        4. Using strong action verbs
-        5. OUTPUT MUST BE ROUGHLY THE SAME LENGTH as input (±20%) - no significantly longer or shorter
-        6. Return ONLY the improved text
-        ${hasMissingKeywords ? '\n7. Carefully evaluate if ANY of these keywords genuinely apply to THIS SPECIFIC bullet point: ' + atsResults.missing_keywords.join(', ') + '\n8. Only incorporate keywords that are TRUTHFUL and RELEVANT to this specific responsibility - do NOT force keywords' : ''}
-
-        ${resumeData?.job_description ? `Job Description:\n${resumeData.job_description}\n\n` : ''}${atsContext}`;
+        ? `Professional resume writer. Refine skills: keep same length (±20%), no new skills, no duplicates, pipe-separated output only. Make professional/industry-standard.${hasMissingKeywords ? ' Add ATS keywords only if directly relevant: ' + atsResults.missing_keywords.slice(0, 5).join(', ') : ''}`
+        : `Professional resume writer. Improve text: same length (±20%), keep facts exact, use action verbs, return improved text only.${hasMissingKeywords ? ' Add relevant keywords: ' + atsResults.missing_keywords.slice(0, 5).join(', ') : ''}`;
 
       const allVersions = [];
 
@@ -105,16 +64,14 @@ IMPORTANT: Try to naturally incorporate these keywords where genuinely applicabl
         const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
 
         try {
-          const numVersions = 2; // Generate 2 AI versions for 3 total options (original + 2 AI)
-          for (let i = 0; i < numVersions; i++) {
-            const response = await api.integrations.Core.InvokeLLM({ prompt: fullPrompt });
-            allVersions.push(response.result || response);
-            
-            // Add delay between versions
-            if (i < numVersions - 1) {
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-          }
+          // Generate 1 AI version for faster response (< 9 seconds target)
+          // User can re-generate if they want a different version
+          const response = await api.integrations.Core.InvokeLLM({
+            prompt: fullPrompt,
+            max_tokens: 500,      // Reduced for faster responses (bullets are short)
+            temperature: 0.3      // Lower temp = faster & more consistent
+          });
+          allVersions.push(response.result || response);
         } catch (err) {
           if (err.message?.includes('rate limit') || err.message?.includes('Rate limit')) {
             throw new Error("Rate limit exceeded. Please wait a moment before trying again.");

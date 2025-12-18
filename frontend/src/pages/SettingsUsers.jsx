@@ -213,13 +213,18 @@ export default function SettingsUsers() {
                   <tr className="border-b dark:border-slate-700">
                     <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Email</th>
                     <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Role</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Auth Method</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Created</th>
+                    <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Subscription</th>
+                    <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Plan</th>
+                    <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Price</th>
+                    <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Coupon</th>
+                    <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Expires</th>
                     <th className="text-right py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((user) => (
+                  {users.map((user) => {
+                    const isSubscribed = user.is_subscribed && user.subscription_end_date && new Date(user.subscription_end_date) > new Date();
+                    return (
                     <tr key={user.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                       <td className="py-3 px-4">{user.email}</td>
                       <td className="py-3 px-4">
@@ -228,12 +233,21 @@ export default function SettingsUsers() {
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <span className={'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium' + (user.auth_method === 'google' ? ' bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : ' bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300')}>
-                          {user.auth_method}
+                        <span className={'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium' + (isSubscribed ? ' bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : ' bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300')}>
+                          {isSubscribed ? 'Active' : 'None'}
                         </span>
                       </td>
+                      <td className="py-3 px-4 text-sm">
+                        {user.subscription_plan || '-'}
+                      </td>
+                      <td className="py-3 px-4 text-sm">
+                        {user.subscription_price ? `$${parseFloat(user.subscription_price).toFixed(2)}` : '-'}
+                      </td>
+                      <td className="py-3 px-4 text-sm font-mono">
+                        {user.coupon_code_used || '-'}
+                      </td>
                       <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">
-                        {new Date(user.created_at).toLocaleDateString()}
+                        {user.subscription_end_date ? new Date(user.subscription_end_date).toLocaleDateString() : '-'}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex justify-end gap-2">
@@ -246,7 +260,8 @@ export default function SettingsUsers() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>

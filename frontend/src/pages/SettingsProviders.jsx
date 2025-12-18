@@ -64,10 +64,12 @@ const PROVIDER_PRESETS = {
   }
 };
 
-// Gemini models - fallback list (free tier compatible only)
+// Gemini models - fallback list with current 2025 models
 const GEMINI_MODELS_FALLBACK = [
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Free Tier)' },
-  { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite (Free Tier)' }
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+  { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' }
 ];
 
 export default function SettingsProviders() {
@@ -133,9 +135,19 @@ export default function SettingsProviders() {
         return;
       }
 
-      // Filter for models that support generateContent
+      // Filter for models that support generateContent and are text generation models
       const validModels = data.models
-        .filter(model => model.supportedGenerationMethods?.includes('generateContent'))
+        .filter(model => {
+          // Must support generateContent
+          if (!model.supportedGenerationMethods?.includes('generateContent')) return false;
+
+          // Filter out embedding, vision-only, and other non-text models
+          const modelId = model.name.replace('models/', '');
+          if (modelId.includes('embedding')) return false;
+          if (modelId.includes('aqa')) return false;
+
+          return true;
+        })
         .map(model => {
           // Extract model name (remove "models/" prefix)
           const modelId = model.name.replace('models/', '');
@@ -145,10 +157,27 @@ export default function SettingsProviders() {
           };
         })
         .sort((a, b) => {
-          // Sort to put recommended models first
-          if (a.id.includes('2.5-flash')) return -1;
-          if (b.id.includes('2.5-flash')) return 1;
-          return a.name.localeCompare(b.name);
+          // Sort by version (newer first): 2.5 > 2.0, then by type (pro > flash > lite)
+          const extractVersion = (id) => {
+            const match = id.match(/gemini-(\d+\.\d+)-(pro|flash|lite)/);
+            if (!match) return { version: 0, type: 'unknown' };
+            return {
+              version: parseFloat(match[1]),
+              type: match[2]
+            };
+          };
+
+          const aInfo = extractVersion(a.id);
+          const bInfo = extractVersion(b.id);
+
+          // Sort by version descending
+          if (aInfo.version !== bInfo.version) {
+            return bInfo.version - aInfo.version;
+          }
+
+          // Then by type: flash > pro > lite (flash is recommended for most use cases)
+          const typeOrder = { 'flash': 0, 'pro': 1, 'lite': 2, 'unknown': 3 };
+          return (typeOrder[aInfo.type] || 3) - (typeOrder[bInfo.type] || 3);
         });
 
       setGeminiModels(validModels.length > 0 ? validModels : GEMINI_MODELS_FALLBACK);

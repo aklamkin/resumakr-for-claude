@@ -59,14 +59,11 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ error: 'Resume not found' });
     }
 
-    // Map professional_summary to summary for database compatibility
-    const summary = professional_summary || '';
-
     const result = await query(
       `INSERT INTO resume_data (
         resume_id,
         personal_info,
-        summary,
+        professional_summary,
         work_experience,
         education,
         skills,
@@ -88,7 +85,7 @@ router.post('/', async (req, res) => {
       [
         resume_id,
         personal_info ? JSON.stringify(personal_info) : '{}',
-        summary,
+        professional_summary || '',
         work_experience ? JSON.stringify(work_experience) : '[]',
         education ? JSON.stringify(education) : '[]',
         skills ? JSON.stringify(skills) : '[]',
@@ -158,16 +155,13 @@ router.put('/:id', async (req, res) => {
 
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
-        // Map professional_summary to summary for database
-        const dbField = field === 'professional_summary' ? 'summary' : field;
-
         // JSONB fields that should be stringified
         const jsonbFields = ['personal_info', 'work_experience', 'education', 'skills', 'certifications', 'projects', 'languages', 'template_custom_colors', 'template_custom_fonts', 'ai_metadata', 'version_history', 'ats_analysis_results'];
 
         if (jsonbFields.includes(field) && typeof req.body[field] === 'object' && req.body[field] !== null) {
-          updates[dbField] = JSON.stringify(req.body[field]);
+          updates[field] = JSON.stringify(req.body[field]);
         } else {
-          updates[dbField] = req.body[field];
+          updates[field] = req.body[field];
         }
       }
     }
@@ -181,14 +175,7 @@ router.put('/:id', async (req, res) => {
     const setClause = fields.map((field, i) => `${field} = $${i + 1}`).join(', ');
     const result = await query(`UPDATE resume_data SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`, [...values, req.params.id]);
 
-    // Map database 'summary' field to frontend 'professional_summary'
-    const data = result.rows[0];
-    if (data.summary !== undefined) {
-      data.professional_summary = data.summary;
-      delete data.summary;
-    }
-
-    res.json(data);
+    res.json(result.rows[0]);
   } catch (error) {
     console.error('Update resume data error:', error);
     res.status(500).json({ error: 'Failed to update resume data' });

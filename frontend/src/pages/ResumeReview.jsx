@@ -145,9 +145,7 @@ export default function ResumeReview() {
 
   const loadPrompts = async () => {
     try {
-      const user = await api.auth.me();
-      if (!user) return;
-      const promptsList = await api.entities.CustomPrompt.filter({ created_by: user.email });
+      const promptsList = await api.entities.CustomPrompt.list();
       setPrompts(promptsList);
     } catch (err) {
       console.error("Failed to load prompts:", err);

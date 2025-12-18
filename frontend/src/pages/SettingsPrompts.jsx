@@ -9,11 +9,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertCircle, Loader2, Edit2, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertCircle, Loader2, Edit2, Plus, Trash2, ChevronDown, ChevronUp, CheckCircle } from "lucide-react";
 import { NotificationPopup } from "../components/ui/notification";
 import { motion } from "framer-motion";
 
 const PROMPT_TYPES = [
+  { value: "improve_bullet", label: "Improve Resume Bullet" },
+  { value: "improve_summary", label: "Improve Professional Summary" },
+  { value: "suggest_bullets", label: "Suggest Bullets" },
   { value: "edit_bullet", label: "Edit Single Resume Bullet" },
   { value: "edit_job", label: "Edit Entire Job" },
   { value: "edit_resume", label: "Edit Entire Resume" },
@@ -26,7 +29,7 @@ export default function SettingsPrompts() {
   const [notification, setNotification] = useState({ open: false, title: "", message: "", type: "success" });
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedType, setSelectedType] = useState("edit_bullet");
+  const [selectedType, setSelectedType] = useState("improve_bullet");
   const [showDialog, setShowDialog] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState(null);
   const [formData, setFormData] = useState({ name: "", prompt_text: "", provider_id: null });
@@ -348,12 +351,12 @@ export default function SettingsPrompts() {
                           onClick={() => handleToggleActive(prompt)}
                           className={`${
                             prompt.is_active
-                              ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800"
-                              : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600"
+                              ? "text-green-600 dark:text-green-400"
+                              : "text-slate-400 dark:text-slate-500"
                           }`}
-                          title={prompt.is_active ? "Deactivate (click to disable)" : "Activate (click to enable)"}
+                          title={prompt.is_active ? "Active (click to deactivate)" : "Inactive (click to activate)"}
                         >
-                          {prompt.is_active ? "Active" : "Inactive"}
+                          <CheckCircle className="w-4 h-4" />
                         </Button>
                       </TableCell>
                       <TableCell className="text-right">

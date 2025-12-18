@@ -27,6 +27,10 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'name and provider_type are required' });
     }
 
+    if (!api_key) {
+      return res.status(400).json({ error: 'api_key is required' });
+    }
+
     // Build config object with api_key if provided
     const configObj = config || {};
     if (api_key) {
@@ -42,8 +46,8 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
     }
 
     const result = await query(
-      'INSERT INTO ai_providers (name, provider_type, api_endpoint, model_name, config, is_default) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [name, provider_type, endpoint, model_name, configObj, is_default || false]
+      'INSERT INTO ai_providers (name, provider_type, api_key, api_endpoint, model_name, config, is_default) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [name, provider_type, api_key, endpoint, model_name, configObj, is_default || false]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -84,8 +88,8 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
     }
 
     const result = await query(
-      'UPDATE ai_providers SET name = COALESCE($1, name), provider_type = COALESCE($2, provider_type), api_endpoint = COALESCE($3, api_endpoint), model_name = COALESCE($4, model_name), config = COALESCE($5, config), is_active = COALESCE($6, is_active), is_default = COALESCE($7, is_default), updated_at = NOW() WHERE id = $8 RETURNING *',
-      [name, provider_type, endpoint, model_name, configObj, is_active, is_default, req.params.id]
+      'UPDATE ai_providers SET name = COALESCE($1, name), provider_type = COALESCE($2, provider_type), api_key = COALESCE($3, api_key), api_endpoint = COALESCE($4, api_endpoint), model_name = COALESCE($5, model_name), config = COALESCE($6, config), is_active = COALESCE($7, is_active), is_default = COALESCE($8, is_default), updated_at = NOW() WHERE id = $9 RETURNING *',
+      [name, provider_type, api_key, endpoint, model_name, configObj, is_active, is_default, req.params.id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Provider not found' });

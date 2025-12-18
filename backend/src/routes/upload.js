@@ -280,7 +280,12 @@ router.post('/extract', async (req, res) => {
 
     if (providers.rows.length === 0) {
       console.error('[EXTRACT] No active AI providers configured');
-      return res.status(503).json({ error: 'No active AI providers configured' });
+      return res.status(503).json({
+        error: 'AI Provider Not Configured',
+        message: 'Resume parsing requires an AI provider to be configured. Please ask an administrator to set up an AI provider (OpenAI, Gemini, etc.) in Admin Settings > AI Providers.',
+        action_required: 'Configure AI Provider',
+        admin_path: '/settingsproviders'
+      });
     }
     const provider = providers.rows[0];
     console.log('[EXTRACT] Using provider:', provider.name, 'type:', provider.provider_type, 'is_default:', provider.is_default);
@@ -488,7 +493,7 @@ BE EXTREMELY THOROUGH. Extract EVERYTHING. Do NOT skip or summarize ANY informat
         console.log('[EXTRACT] Attempting to use model:', model);
         aiResponse = await callAI(aiClient, prompt, systemPrompt, model, {
           temperature: 0,
-          max_tokens: 4000
+          max_tokens: 8000
         });
         usedModel = model;
         console.log('[EXTRACT] Successfully used model:', model, '- Response length:', aiResponse.content.length);

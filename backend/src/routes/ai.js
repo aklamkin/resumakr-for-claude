@@ -94,7 +94,27 @@ export async function callAI(aiClientWrapper, prompt, systemPrompt, modelName, o
       usage: completion.usage
     };
   } else if (type === 'gemini') {
-    const model = client.getGenerativeModel({ model: modelName });
+    const model = client.getGenerativeModel({
+      model: modelName,
+      safetySettings: [
+        {
+          category: 'HARM_CATEGORY_HARASSMENT',
+          threshold: 'BLOCK_NONE'
+        },
+        {
+          category: 'HARM_CATEGORY_HATE_SPEECH',
+          threshold: 'BLOCK_NONE'
+        },
+        {
+          category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+          threshold: 'BLOCK_NONE'
+        },
+        {
+          category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+          threshold: 'BLOCK_NONE'
+        }
+      ]
+    });
 
     const fullPrompt = `${systemPrompt}\n\n${prompt}`;
 
@@ -107,6 +127,16 @@ export async function callAI(aiClientWrapper, prompt, systemPrompt, modelName, o
     });
 
     const response = result.response;
+
+    // Log finish reason and safety ratings for debugging
+    const candidate = response.candidates?.[0];
+    if (candidate) {
+      console.log('[GEMINI] Finish reason:', candidate.finishReason);
+      if (candidate.safetyRatings) {
+        console.log('[GEMINI] Safety ratings:', JSON.stringify(candidate.safetyRatings));
+      }
+    }
+
     return {
       content: response.text(),
       usage: {
@@ -122,7 +152,7 @@ export async function callAI(aiClientWrapper, prompt, systemPrompt, modelName, o
 
 router.post('/invoke', async (req, res) => {
   try {
-    const { prompt, response_json_schema, provider_id, model } = req.body;
+    const { prompt, response_json_schema, provider_id, model, max_tokens, temperature } = req.body;
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt is required' });
     }
@@ -161,8 +191,8 @@ router.post('/invoke', async (req, res) => {
     const modelToUse = model || provider.model_name || 'gpt-4o-mini';
 
     const aiResponse = await callAI(aiClientWrapper, userPrompt, systemPrompt, modelToUse, {
-      temperature: 0.7,
-      max_tokens: 2000
+      temperature: temperature ?? 0.3,  // Lower temp for faster, more consistent responses
+      max_tokens: max_tokens ?? 800     // Reduced from 2000 for faster responses
     });
 
     const content = aiResponse.content;

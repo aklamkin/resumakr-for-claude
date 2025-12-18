@@ -12,14 +12,9 @@ const isUniqueViolation = (error) => {
 // Get all prompts with optional filtering by prompt_type
 router.get('/', authenticate, async (req, res) => {
   try {
-    const { created_by, prompt_type } = req.query;
-    let sql = 'SELECT cp.*, ap.name as provider_name, ap.provider_type FROM custom_prompts cp LEFT JOIN ai_providers ap ON cp.provider_id = ap.id WHERE 1=1';
-    const params = [];
-
-    if (created_by) {
-      params.push(created_by);
-      sql += ` AND cp.created_by = $${params.length}`;
-    }
+    const { prompt_type } = req.query;
+    let sql = 'SELECT cp.*, ap.name as provider_name, ap.provider_type FROM custom_prompts cp LEFT JOIN ai_providers ap ON cp.provider_id = ap.id WHERE cp.created_by = $1';
+    const params = [req.user.id];
 
     if (prompt_type) {
       params.push(prompt_type);

@@ -145,8 +145,8 @@ export default function Pricing() {
   const calculateFinalPrice = (planId) => {
     const plan = plans.find(p => p.plan_id === planId);
     if (!plan) return { final: "0.00", original: "0.00" };
-    
-    let basePrice = plan.price;
+
+    let basePrice = parseFloat(plan.price);
     const originalPrice = basePrice;
     
     const isCampaignPlan = activeCampaign && activeCampaign.target_plan === planId;
@@ -194,9 +194,11 @@ export default function Pricing() {
       navigate('/login?returnUrl=Pricing');
       return;
     }
-    
+
     setActivating(true);
     try {
+      const finalPrice = calculateFinalPrice(selectedPlan);
+
       // Call the backend subscription activation endpoint
       const response = await fetch('/api/subscriptions/activate', {
         method: 'POST',
@@ -205,7 +207,10 @@ export default function Pricing() {
           'Authorization': `Bearer ${localStorage.getItem('resumakr_token')}`
         },
         body: JSON.stringify({
-          plan_id: selectedPlan
+          plan_id: selectedPlan,
+          coupon_code: appliedCoupon?.code || null,
+          campaign_id: activeCampaign?.id || null,
+          final_price: parseFloat(finalPrice.final)
         })
       });
 

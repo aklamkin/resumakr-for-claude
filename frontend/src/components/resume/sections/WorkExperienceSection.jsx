@@ -1,9 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Bot, Undo, Sparkles, Loader2, CheckCircle, GripVertical, Trash2, Plus } from "lucide-react";
+import { Bot, Undo, Sparkles, Loader2, CheckCircle, GripVertical, Trash2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import EditableSection from "../EditableSection";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -27,6 +27,9 @@ export default function WorkExperienceSection({
     canUndo,
     providers 
   } = aiHelpers;
+
+  // Track current version index for each job's "Improve All Bullets" carousel
+  const [jobVersionIndexes, setJobVersionIndexes] = useState({});
 
   const foundKeywords = atsResults?.keywords_found_resume || [];
   const missingKeywords = atsResults?.missing_keywords || [];
@@ -298,44 +301,110 @@ export default function WorkExperienceSection({
                     <div className="flex items-center justify-center p-8">
                       <Loader2 className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-spin" />
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <ul className="list-disc list-inside space-y-2 ml-4">
-                        {sectionVersions[`exp-all-${expIndex}`]?.[0]
-                          ?.split('\n')
-                          .map(line => line.trim())
-                          .filter(line => line.length > 0)
-                          .map(line => line.replace(/^[•\-\*]\s*/, ''))
-                          .map((bullet, idx) => (
-                            <li key={idx} className="text-slate-800 dark:text-slate-300">{bullet}</li>
-                          ))
-                        }
-                      </ul>
-                      <div className="flex items-center justify-end pt-3 border-t border-indigo-200 dark:border-indigo-800">
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            const version = sectionVersions[`exp-all-${expIndex}`][0];
-                            const bullets = version
-                              .split('\n')
-                              .map(line => line.trim())
-                              .filter(line => line.length > 0)
-                              .map(line => line.replace(/^[•\-\*]\s*/, ''));
+                  ) : (() => {
+                    // Combine AI versions with original (original goes at the end)
+                    const allVersions = sectionVersions[`exp-all-${expIndex}`]
+                      ? [...sectionVersions[`exp-all-${expIndex}`], exp.responsibilities]
+                      : [];
+                    const currentIndex = jobVersionIndexes[`exp-all-${expIndex}`] || 0;
+                    const isOriginal = currentIndex === allVersions.length - 1;
+                    const currentVersion = allVersions[currentIndex];
 
-                            acceptVersion(
-                              `exp-all-${expIndex}`,
-                              bullets,
-                              `work_experience.${expIndex}.responsibilities`
-                            );
-                          }}
-                          className="bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white"
-                        >
-                          <CheckCircle className="w-4 h-4 mr-1" />
-                          Use This Version
-                        </Button>
+                    const parseBullets = (content) => {
+                      if (Array.isArray(content)) return content;
+                      return content
+                        .split('\n')
+                        .map(line => line.trim())
+                        .filter(line => line.length > 0)
+                        .map(line => line.replace(/^[•\-\*]\s*/, ''));
+                    };
+
+                    const bullets = parseBullets(currentVersion);
+
+                    return (
+                      <div className={`transition-all duration-200 rounded-lg p-4 ${
+                        isOriginal
+                          ? 'bg-green-50 dark:bg-green-950/30 border-2 border-green-300 dark:border-green-700'
+                          : 'bg-indigo-50 dark:bg-indigo-950/30 border-2 border-indigo-200 dark:border-indigo-700'
+                      }`}>
+                        <ul className="list-disc list-inside space-y-2 ml-4">
+                          {bullets.map((bullet, idx) => (
+                            <li key={idx} className="text-slate-800 dark:text-slate-300">{bullet}</li>
+                          ))}
+                        </ul>
+                        <div className={`flex items-center justify-between mt-3 pt-3 border-t ${
+                          isOriginal ? 'border-green-300 dark:border-green-700' : 'border-indigo-200 dark:border-indigo-700'
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const newIndex = currentIndex > 0 ? currentIndex - 1 : allVersions.length - 1;
+                                setJobVersionIndexes(prev => ({ ...prev, [`exp-all-${expIndex}`]: newIndex }));
+                              }}
+                              className="h-8 w-8 p-0 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
+                              disabled={allVersions.length <= 1}
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </Button>
+                            <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">
+                              {isOriginal
+                                ? `Original (${allVersions.length} of ${allVersions.length})`
+                                : `Version ${currentIndex + 1} of ${allVersions.length}`
+                              }
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const newIndex = currentIndex < allVersions.length - 1 ? currentIndex + 1 : 0;
+                                setJobVersionIndexes(prev => ({ ...prev, [`exp-all-${expIndex}`]: newIndex }));
+                              }}
+                              className="h-8 w-8 p-0 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
+                              disabled={allVersions.length <= 1}
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              if (isOriginal) {
+                                // Keep original - just clear the versions
+                                setJobVersionIndexes(prev => {
+                                  const updated = { ...prev };
+                                  delete updated[`exp-all-${expIndex}`];
+                                  return updated;
+                                });
+                                // Don't call acceptVersion, just dismiss the carousel
+                                return;
+                              }
+
+                              const bullets = parseBullets(currentVersion);
+                              acceptVersion(
+                                `exp-all-${expIndex}`,
+                                bullets,
+                                `work_experience.${expIndex}.responsibilities`
+                              );
+                              setJobVersionIndexes(prev => {
+                                const updated = { ...prev };
+                                delete updated[`exp-all-${expIndex}`];
+                                return updated;
+                              });
+                            }}
+                            className={isOriginal
+                              ? "bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white"
+                              : "bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white"
+                            }
+                          >
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            {isOriginal ? "Keep Original" : "Use This Version"}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               ) : (
                 exp.responsibilities && exp.responsibilities.length > 0 && (

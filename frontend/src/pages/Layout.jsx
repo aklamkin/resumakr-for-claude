@@ -257,17 +257,6 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
             <>
               {user ? (
                 <div className="space-y-3">
-                  {subscriptionInfo?.isActive && (
-                    <div className="px-3 py-2 bg-accent/10 rounded-md">
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <Tag className="h-4 w-4 text-accent" />
-                        <span className="text-accent">{subscriptionInfo.plan} Plan</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Until {formatDateWithYear(subscriptionInfo.endDate)}
-                      </p>
-                    </div>
-                  )}
                   <div className="flex items-center justify-between px-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <User className="h-4 w-4 flex-shrink-0" />
@@ -283,11 +272,16 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                       <LogOut className="h-4 w-4" />
                     </Button>
                   </div>
-                  {!subscriptionInfo?.isActive && (
-                    <Button onClick={handleSubscriptionClick} className="w-full" size="sm">
-                      Upgrade Plan
-                    </Button>
-                  )}
+                  <Button
+                    onClick={handleSubscriptionClick}
+                    className="w-full"
+                    size="sm"
+                    variant={subscriptionInfo?.isActive ? "outline" : "default"}
+                  >
+                    {subscriptionInfo?.isActive
+                      ? `${subscriptionInfo.plan.charAt(0).toUpperCase() + subscriptionInfo.plan.slice(1)} Plan`
+                      : 'Upgrade Plan'}
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-2">
