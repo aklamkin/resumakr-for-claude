@@ -1,7 +1,14 @@
 {
   "name": "resumakr-backend",
   "version": "1.0.0",
+  "description": "Backend API for Resumakr - AI-powered resume builder",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aklamkin/resumakr-for-claude.git"
+  },
+  "author": "Resumakr Team",
+  "license": "MIT",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js"

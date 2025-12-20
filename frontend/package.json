@@ -1,8 +1,15 @@
 {
-  "name": "base44-app",
+  "name": "resumakr-frontend",
+  "version": "1.0.0",
+  "description": "Frontend application for Resumakr - AI-powered resume builder",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aklamkin/resumakr-for-claude.git"
+  },
+  "author": "Resumakr Team",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -10,7 +17,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@base44/sdk": "^0.1.2",
     "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^4.1.2",
     "@radix-ui/react-accordion": "^1.2.3",

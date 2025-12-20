@@ -51,7 +51,7 @@ This is the easiest way to get started. All services run in containers.
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/resumakr-for-claude.git
+   git clone https://github.com/aklamkin/resumakr-for-claude.git
    cd resumakr-for-claude
    ```
 
@@ -92,7 +92,7 @@ If you prefer to run services locally without Docker:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/resumakr-for-claude.git
+   git clone https://github.com/aklamkin/resumakr-for-claude.git
    cd resumakr-for-claude
    ```
 
