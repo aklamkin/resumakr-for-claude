@@ -250,22 +250,11 @@ export default function BuildWizard() {
             {currentStep === 0 ? "Back to Home" : "Previous Step"}
           </Button>
 
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Build Your Resume</h1>
-              <p className="text-slate-600 dark:text-slate-400 mt-1">
-                Step {currentStep + 1} of {steps.length}: {steps[currentStep].title}
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              onClick={saveProgress}
-              disabled={saving}
-              className="hidden md:flex border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              {saving ? "Saving..." : "Save Progress"}
-            </Button>
+          <div className="mb-4">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Build Your Resume</h1>
+            <p className="text-slate-600 dark:text-slate-400 mt-1">
+              Step {currentStep + 1} of {steps.length}: {steps[currentStep].title}
+            </p>
           </div>
 
           <Progress value={progress} className="h-2" />
@@ -313,7 +302,7 @@ export default function BuildWizard() {
         </AnimatePresence>
 
         {/* Navigation Buttons */}
-        <div className="flex justify-between mt-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-8">
           <Button
             variant="outline"
             onClick={handleBack}
@@ -322,7 +311,16 @@ export default function BuildWizard() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             {currentStep === 0 ? "Cancel" : "Back"}
           </Button>
-          
+
+          <Button
+            onClick={saveProgress}
+            disabled={saving}
+            className="px-6 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {saving ? "Saving..." : "Save Progress"}
+          </Button>
+
           <Button
             onClick={handleNext}
             disabled={saving}
