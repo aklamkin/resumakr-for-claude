@@ -6,8 +6,9 @@ import api from "@/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ArrowRight, Save } from "lucide-react";
+import { ArrowLeft, ArrowRight, Save, Home } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { ConfirmDialog, NotificationPopup } from "../components/ui/notification";
 
 import PersonalInfoStep from "../components/wizard/PersonalInfoStep";
 import WorkExperienceStep from "../components/wizard/WorkExperienceStep";
@@ -40,6 +41,16 @@ export default function BuildWizard() {
   const [saving, setSaving] = useState(false);
   const [checkingSubscription, setCheckingSubscription] = useState(true);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [notification, setNotification] = useState({ open: false, title: "", message: "", type: "success" });
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+    confirmText: "Continue",
+    cancelText: "Cancel",
+    type: "default"
+  });
 
   useEffect(() => {
     checkSubscription();
@@ -75,30 +86,69 @@ export default function BuildWizard() {
 
   const initializeResume = async () => {
     try {
-      // Always create a new blank resume for the wizard
-      // This ensures "+ Create Resume" starts fresh every time
-      const newResume = await api.entities.Resume.create({
-        title: "New Resume",
-        status: "draft",
-        source_type: "manual",
-        last_edited_step: "personal"
-      });
-      setResumeId(newResume.id);
+      // Check if resumeId is passed in URL (for continuing existing draft)
+      const urlParams = new URLSearchParams(window.location.search);
+      const existingResumeId = urlParams.get('resumeId');
 
-      // Initialize with blank data structure
-      setResumeData({
-        personal_info: {},
-        professional_summary: "",
-        work_experience: [],
-        education: [],
-        skills: [],
-        certifications: [],
-        projects: [],
-        languages: []
-      });
+      if (existingResumeId) {
+        // Load existing draft resume
+        console.log("Loading existing resume:", existingResumeId);
+        setResumeId(existingResumeId);
+
+        // Try to get existing resume data
+        try {
+          const existingData = await api.entities.ResumeData.getByResumeId(existingResumeId);
+          if (existingData) {
+            setResumeData(existingData);
+            console.log("Loaded existing resume data");
+          }
+        } catch (error) {
+          console.log("No existing resume data found, starting fresh");
+        }
+
+        // Get the resume to check last_edited_step
+        try {
+          const resume = await api.entities.Resume.get(existingResumeId);
+          if (resume.last_edited_step) {
+            const stepIndex = steps.findIndex(s => s.id === resume.last_edited_step);
+            if (stepIndex >= 0) {
+              setCurrentStep(stepIndex);
+            }
+          }
+        } catch (error) {
+          console.log("Could not load resume details");
+        }
+      } else {
+        // Always create a new blank resume for the wizard
+        // This ensures "+ Create Resume" starts fresh every time
+        const newResume = await api.entities.Resume.create({
+          title: "New Resume",
+          status: "draft",
+          source_type: "manual",
+          last_edited_step: "personal"
+        });
+        setResumeId(newResume.id);
+
+        // Initialize with blank data structure
+        setResumeData({
+          personal_info: {},
+          professional_summary: "",
+          work_experience: [],
+          education: [],
+          skills: [],
+          certifications: [],
+          projects: [],
+          languages: []
+        });
+      }
     } catch (error) {
       console.error("Error initializing resume:", error);
-      // Optionally, navigate to an error page or show a message
+      setNotification({
+        open: true,
+        title: "Error",
+        message: "Failed to load resume. Please try again.",
+        type: "error"
+      });
     }
   };
 
@@ -106,10 +156,16 @@ export default function BuildWizard() {
     setResumeData(prev => ({ ...prev, ...stepData }));
   };
 
-  const saveProgress = async () => {
+  const saveProgress = async (showDialog = false) => {
     if (!resumeId) {
       console.error("Cannot save progress: resumeId is missing");
-      throw new Error("Resume ID is missing. Please refresh the page and try again.");
+      setNotification({
+        open: true,
+        title: "Error",
+        message: "Resume ID is missing. Please refresh the page and try again.",
+        type: "error"
+      });
+      return;
     }
 
     console.log("Saving progress - resumeId:", resumeId);
@@ -143,10 +199,37 @@ export default function BuildWizard() {
       });
 
       console.log("Progress saved successfully");
+
+      // Show success feedback
+      if (showDialog) {
+        setConfirmDialog({
+          open: true,
+          title: "Progress Saved!",
+          message: "Your resume draft has been saved. You can find it on your My Resumes page to continue editing later.\n\nWould you like to return to My Resumes now?",
+          onConfirm: () => {
+            navigate(createPageUrl("MyResumes"));
+          },
+          confirmText: "Go to My Resumes",
+          cancelText: "Continue Editing",
+          type: "default"
+        });
+      } else {
+        setNotification({
+          open: true,
+          title: "Saved!",
+          message: "Your progress has been saved successfully.",
+          type: "success"
+        });
+      }
     } catch (error) {
       console.error("Error saving progress:", error);
       console.error("Error details:", error.response?.data || error.message);
-      throw error; // Re-throw so handleNext can catch it
+      setNotification({
+        open: true,
+        title: "Save Failed",
+        message: error.response?.data?.error || error.message || "Failed to save progress. Please try again.",
+        type: "error"
+      });
     } finally {
       setSaving(false);
     }
@@ -313,7 +396,7 @@ export default function BuildWizard() {
           </Button>
 
           <Button
-            onClick={saveProgress}
+            onClick={() => saveProgress(true)}
             disabled={saving}
             className="px-6 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white"
           >
@@ -331,6 +414,25 @@ export default function BuildWizard() {
           </Button>
         </div>
       </div>
+
+      <NotificationPopup
+        open={notification.open}
+        onClose={() => setNotification({ ...notification, open: false })}
+        title={notification.title}
+        message={notification.message}
+        type={notification.type}
+      />
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        cancelText={confirmDialog.cancelText}
+        type={confirmDialog.type}
+      />
     </div>
   );
 }

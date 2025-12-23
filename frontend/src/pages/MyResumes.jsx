@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Calendar, Eye, Trash2, Upload, Sparkles, Edit2, Check, X, Copy, Loader2, Lock } from "lucide-react";
+import { Plus, Calendar, Eye, Trash2, Upload, Sparkles, Edit2, Check, X, Copy, Loader2, Lock, FileEdit } from "lucide-react";
 import { motion } from "framer-motion";
 import { ConfirmDialog, NotificationPopup } from "../components/ui/notification";
 import ExportDropdown from "../components/resume/ExportDropdown";
@@ -1097,13 +1097,18 @@ export default function MyResumes() {
                       ) : (
                         <div className="mb-3">
                           <div className="group/title flex items-center gap-2 mb-2">
-                            <h3 
+                            <h3
                               className={`text-base font-bold text-slate-900 dark:text-slate-100 ${isSubscribed ? "cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400" : ""} transition-colors flex-1 min-w-0 truncate`}
                               onClick={() => isSubscribed && startEditing(resume)}
                               title={resume.title}
                             >
                               {resume.title}
                             </h3>
+                            {resume.status === 'draft' && (
+                              <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded-full flex-shrink-0">
+                                Draft
+                              </span>
+                            )}
                             {isSubscribed && (
                               <button
                                 onClick={() => startEditing(resume)}
@@ -1132,16 +1137,29 @@ export default function MyResumes() {
                       )}
 
                       <div className="flex items-center gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => isSubscribed ? navigate(createPageUrl(`ResumeReview?id=${resume.id}`)) : handleSubscriptionRequired()}
-                          className="flex-1 text-sm h-8 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-                          disabled={!isSubscribed}
-                        >
-                          <Eye className="w-3 h-3 mr-1" />
-                          View
-                        </Button>
+                        {resume.status === 'draft' ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => isSubscribed ? navigate(createPageUrl(`BuildWizard?resumeId=${resume.id}`)) : handleSubscriptionRequired()}
+                            className="flex-1 text-sm h-8 border-emerald-300 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300"
+                            disabled={!isSubscribed}
+                          >
+                            <FileEdit className="w-3 h-3 mr-1" />
+                            Continue Editing
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => isSubscribed ? navigate(createPageUrl(`ResumeReview?id=${resume.id}`)) : handleSubscriptionRequired()}
+                            className="flex-1 text-sm h-8 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                            disabled={!isSubscribed}
+                          >
+                            <Eye className="w-3 h-3 mr-1" />
+                            View
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
