@@ -75,36 +75,27 @@ export default function BuildWizard() {
 
   const initializeResume = async () => {
     try {
-      const user = await api.auth.me();
-      const existingDrafts = await api.entities.Resume.filter({
+      // Always create a new blank resume for the wizard
+      // This ensures "+ Create Resume" starts fresh every time
+      const newResume = await api.entities.Resume.create({
+        title: "New Resume",
         status: "draft",
         source_type: "manual",
-        created_by: user.email
+        last_edited_step: "personal"
       });
+      setResumeId(newResume.id);
 
-      if (existingDrafts.length > 0) {
-        const draft = existingDrafts[0];
-        setResumeId(draft.id);
-
-        // Try to get existing resume data
-        try {
-          const existingData = await api.entities.ResumeData.getByResumeId(draft.id);
-          if (existingData) {
-            setResumeData(existingData);
-          }
-        } catch (error) {
-          // No existing data yet, that's okay - user will fill it in
-          console.log("No existing resume data found, starting fresh");
-        }
-      } else {
-        const newResume = await api.entities.Resume.create({
-          title: "My Resume",
-          status: "draft",
-          source_type: "manual",
-          last_edited_step: "personal"
-        });
-        setResumeId(newResume.id);
-      }
+      // Initialize with blank data structure
+      setResumeData({
+        personal_info: {},
+        professional_summary: "",
+        work_experience: [],
+        education: [],
+        skills: [],
+        certifications: [],
+        projects: [],
+        languages: []
+      });
     } catch (error) {
       console.error("Error initializing resume:", error);
       // Optionally, navigate to an error page or show a message
