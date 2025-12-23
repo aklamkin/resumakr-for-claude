@@ -1104,11 +1104,6 @@ export default function MyResumes() {
                             >
                               {resume.title}
                             </h3>
-                            {resume.status === 'draft' && (
-                              <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded-full flex-shrink-0">
-                                Draft
-                              </span>
-                            )}
                             {isSubscribed && (
                               <button
                                 onClick={() => startEditing(resume)}
@@ -1126,9 +1121,9 @@ export default function MyResumes() {
                             </div>
                             <div className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
-                                <span>Last saved: {new Date(resume.updated_date).toLocaleDateString('en-US', { 
+                                <span>Last saved: {new Date(resume.updated_at).toLocaleDateString('en-US', {
                                   year: 'numeric',
-                                  month: 'short', 
+                                  month: 'short',
                                   day: 'numeric'
                                 })}</span>
                               </div>
@@ -1137,7 +1132,7 @@ export default function MyResumes() {
                       )}
 
                       <div className="flex items-center gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
-                        {resume.status === 'draft' ? (
+                        {resume.source_type === 'manual' && resume.status === 'draft' ? (
                           <Button
                             variant="outline"
                             size="sm"
@@ -1146,18 +1141,18 @@ export default function MyResumes() {
                             disabled={!isSubscribed}
                           >
                             <FileEdit className="w-3 h-3 mr-1" />
-                            Continue Editing
+                            Continue Wizard
                           </Button>
                         ) : (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => isSubscribed ? navigate(createPageUrl(`ResumeReview?id=${resume.id}`)) : handleSubscriptionRequired()}
-                            className="flex-1 text-sm h-8 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                            className="flex-1 text-sm h-8 border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-950 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300"
                             disabled={!isSubscribed}
                           >
-                            <Eye className="w-3 h-3 mr-1" />
-                            View
+                            <Edit2 className="w-3 h-3 mr-1" />
+                            Edit
                           </Button>
                         )}
                         <Button
@@ -1289,9 +1284,9 @@ export default function MyResumes() {
                               </div>
                               <div className="flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />
-                                <span>Last saved: {new Date(resume.updated_date).toLocaleString('en-US', { 
+                                <span>Last saved: {new Date(resume.updated_at).toLocaleString('en-US', {
                                   year: 'numeric',
-                                  month: 'short', 
+                                  month: 'short',
                                   day: 'numeric',
                                   hour: 'numeric',
                                   minute: '2-digit',
@@ -1302,16 +1297,29 @@ export default function MyResumes() {
                           </div>
 
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => isSubscribed ? navigate(createPageUrl(`ResumeReview?id=${resume.id}`)) : handleSubscriptionRequired()}
-                              className="text-sm h-8 px-3 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-                              disabled={!isSubscribed}
-                            >
-                              <Eye className="w-3 h-3 mr-1" />
-                              View
-                            </Button>
+                            {resume.source_type === 'manual' && resume.status === 'draft' ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => isSubscribed ? navigate(createPageUrl(`BuildWizard?resumeId=${resume.id}`)) : handleSubscriptionRequired()}
+                                className="text-sm h-8 px-3 border-emerald-300 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300"
+                                disabled={!isSubscribed}
+                              >
+                                <FileEdit className="w-3 h-3 mr-1" />
+                                Continue Wizard
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => isSubscribed ? navigate(createPageUrl(`ResumeReview?id=${resume.id}`)) : handleSubscriptionRequired()}
+                                className="text-sm h-8 px-3 border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-950 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300"
+                                disabled={!isSubscribed}
+                              >
+                                <Edit2 className="w-3 h-3 mr-1" />
+                                Edit
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
