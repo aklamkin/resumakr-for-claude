@@ -223,15 +223,15 @@ export default function MyResumes() {
 
   const sortedResumes = [...resumes].sort((a, b) => {
     let comparison = 0;
-    
+
     if (sortBy === "name") {
-      comparison = b.title.localeCompare(a.title); 
+      comparison = b.title.localeCompare(a.title);
     } else if (sortBy === "created") {
-      comparison = new Date(b.created_date).getTime() - new Date(a.created_date).getTime();
+      comparison = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     } else {
-      comparison = new Date(b.updated_date).getTime() - new Date(a.updated_date).getTime();
+      comparison = new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     }
-    
+
     return sortDirection === "asc" ? -comparison : comparison;
   });
 
