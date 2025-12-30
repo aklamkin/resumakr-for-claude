@@ -2,6 +2,29 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🚨 IMPORTANT: Recent Development (Dec 30, 2025)
+
+**Major features implemented since Nov 28, 2024:**
+- ✅ Google OAuth authentication (configured)
+- ✅ Complete Stripe payment integration (backend + frontend)
+- ✅ Subscription-required paywall protection
+- ✅ Webhook event processing
+- ✅ Test discount code: `TESTFREE` (100% off)
+
+**📖 Full details in:** `DEVELOPMENT_LOG.md`
+
+**⏳ Remaining tasks:**
+- Frontend paywall UI components (upgrade prompts, subscription status)
+- End-to-end testing with Stripe test cards
+
+**🔑 Quick context:**
+- All resume operations now require active subscription
+- Marketing campaigns can provide free trial periods
+- Stripe Checkout handles all payment processing
+- Webhooks at `/api/webhooks/stripe` process subscription events
+
+---
+
 ## Project Overview
 
 Resumakr is a full-stack SaaS resume builder application with AI-powered features. Originally built on Base44, it has been migrated to a standalone architecture with PostgreSQL database and Express backend.
