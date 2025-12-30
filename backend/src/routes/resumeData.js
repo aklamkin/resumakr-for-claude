@@ -1,9 +1,10 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, requireSubscription } from '../middleware/auth.js';
 
 const router = express.Router();
 router.use(authenticate);
+router.use(requireSubscription); // Resume data operations require active subscription
 
 router.get('/by-resume/:resumeId', async (req, res) => {
   try {
