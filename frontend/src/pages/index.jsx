@@ -12,6 +12,7 @@ import Pricing from "./Pricing";
 import Help from "./Help";
 import AccountSettings from "./AccountSettings.jsx";
 import SubscriptionManagement from "./SubscriptionManagement";
+import SubscriptionSuccess from "./SubscriptionSuccess";
 import SettingsProviders from "./SettingsProviders";
 import SettingsPrompts from "./SettingsPrompts";
 import SettingsPlans from "./SettingsPlans";
@@ -90,6 +91,7 @@ function PagesContent() {
                 <Route path="/Help" element={<Help />} />
                 <Route path="/AccountSettings" element={<AccountSettings />} />
                 <Route path="/SubscriptionManagement" element={<SubscriptionManagement />} />
+                <Route path="/subscription-success" element={<SubscriptionSuccess />} />
                 <Route path="/SettingsProviders" element={<SettingsProviders />} />
                 <Route path="/SettingsPrompts" element={<SettingsPrompts />} />
                 <Route path="/SettingsPlans" element={<SettingsPlans />} />

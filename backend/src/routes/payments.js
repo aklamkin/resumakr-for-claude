@@ -12,7 +12,7 @@ router.use(authenticate);
  */
 router.post('/create-checkout-session', async (req, res) => {
   try {
-    const { plan_id, coupon_code, return_url } = req.body;
+    const { plan_id, coupon_code, success_url, cancel_url } = req.body;
 
     if (!plan_id) {
       return res.status(400).json({ error: 'plan_id is required' });
@@ -37,8 +37,8 @@ router.post('/create-checkout-session', async (req, res) => {
       email: req.user.email,
       fullName: req.user.full_name,
       priceId: plan.stripe_price_id,
-      successUrl: `${process.env.FRONTEND_URL}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${process.env.FRONTEND_URL}/pricing?${return_url ? `returnUrl=${return_url}` : ''}`,
+      successUrl: success_url || `${process.env.FRONTEND_URL}/subscription-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: cancel_url || `${process.env.FRONTEND_URL}/pricing`,
       couponCode: coupon_code
     });
 

@@ -57,13 +57,6 @@ export default function Pricing() {
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [couponError, setCouponError] = useState("");
-  
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
-  const [cvv, setCvv] = useState("");
-  const [zipCode, setZipCode] = useState("");
-  const [doNotRenew, setDoNotRenew] = useState(false);
-  const [showButton, setShowButton] = useState(false);
 
   const returnUrl = new URLSearchParams(location.search).get("returnUrl") || "MyResumes";
 
@@ -98,10 +91,6 @@ export default function Pricing() {
       setSelectedPlan(plans.find(p => p.is_popular)?.plan_id || plans[0].plan_id);
     }
   }, [plans, selectedPlan]);
-
-  useEffect(() => {
-    setShowButton(zipCode === "10309" && doNotRenew);
-  }, [zipCode, doNotRenew]);
 
   const handlePlanSelect = (planId) => {
     setSelectedPlan(planId);
@@ -165,15 +154,6 @@ export default function Pricing() {
     return { final: basePrice.toFixed(2), original: originalPrice.toFixed(2) };
   };
 
-  const handleZipCodeChange = (e) => {
-    setZipCode(e.target.value);
-  };
-
-  const handleZipCodePaste = (e) => {
-    e.preventDefault();
-    return false;
-  };
-
   const calculateSubscriptionDates = (planId) => {
     const plan = plans.find(p => p.plan_id === planId);
     const startDate = new Date();
@@ -197,10 +177,11 @@ export default function Pricing() {
 
     setActivating(true);
     try {
-      const finalPrice = calculateFinalPrice(selectedPlan);
+      // Get the base URL from environment or current window location
+      const frontendUrl = import.meta.env.VITE_FRONTEND_URL || window.location.origin;
 
-      // Call the backend subscription activation endpoint
-      const response = await fetch('/api/subscriptions/activate', {
+      // Create Stripe Checkout session
+      const response = await fetch('/api/payments/create-checkout-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -209,28 +190,23 @@ export default function Pricing() {
         body: JSON.stringify({
           plan_id: selectedPlan,
           coupon_code: appliedCoupon?.code || null,
-          campaign_id: activeCampaign?.id || null,
-          final_price: parseFloat(finalPrice.final)
+          success_url: `${frontendUrl}/subscription-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${frontendUrl}/pricing?canceled=true`
         })
       });
 
       if (!response.ok) {
-        throw new Error('Subscription activation failed');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create checkout session');
       }
 
       const data = await response.json();
-      
-      // Refresh user data
-      await queryClient.invalidateQueries(['current-user']);
-      
-      // Redirect to return URL
-      setTimeout(() => {
-        navigate(createPageUrl(returnUrl));
-      }, 500);
+
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
     } catch (err) {
-      console.error("Error activating subscription:", err);
-      alert("Failed to activate subscription. Please try again.");
-    } finally {
+      console.error("Error creating checkout session:", err);
+      alert(err.message || "Failed to start checkout. Please try again.");
       setActivating(false);
     }
   };
@@ -532,7 +508,7 @@ export default function Pricing() {
                       </Button>
                     </motion.div>
                   )}
-                  
+
                   <AnimatePresence>
                     {couponError && (
                       <motion.p
@@ -561,8 +537,8 @@ export default function Pricing() {
                       <div className="flex justify-between text-green-600 dark:text-green-400 font-medium">
                         <span>Coupon Discount:</span>
                         <span>
-                          -{appliedCoupon.discount_type === 'percentage' 
-                            ? `${appliedCoupon.discount_value}%` 
+                          -{appliedCoupon.discount_type === 'percentage'
+                            ? `${appliedCoupon.discount_value}%`
                             : `$${appliedCoupon.discount_value}`}
                         </span>
                       </div>
@@ -574,103 +550,28 @@ export default function Pricing() {
                   </motion.div>
                 )}
 
-                <div className="flex items-center gap-3 text-slate-700 dark:text-slate-300 mb-6">
-                  <CreditCard className="w-5 h-5" />
-                  <span className="font-medium">Payment Information</span>
-                </div>
-
-                <div>
-                  <Label htmlFor="cardNumber" className="text-slate-700 dark:text-slate-300">Card Number</Label>
-                  <Input
-                    id="cardNumber"
-                    type="text"
-                    placeholder="1234 5678 9012 3456"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                    maxLength={19}
-                    className="mt-1 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 border-slate-200 dark:border-slate-700"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="expiryDate" className="text-slate-700 dark:text-slate-300">Expiry Date</Label>
-                    <Input
-                      id="expiryDate"
-                      type="text"
-                      placeholder="MM/YY"
-                      value={expiryDate}
-                      onChange={(e) => setExpiryDate(e.target.value)}
-                      maxLength={5}
-                      className="mt-1 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 border-slate-200 dark:border-slate-700"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="cvv" className="text-slate-700 dark:text-slate-300">CVV</Label>
-                    <Input
-                      id="cvv"
-                      type="text"
-                      placeholder="123"
-                      value={cvv}
-                      onChange={(e) => setCvv(e.target.value)}
-                      maxLength={4}
-                      className="mt-1 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 border-slate-200 dark:border-slate-700"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="zipCode" className="text-slate-700 dark:text-slate-300">ZIP Code</Label>
-                  <Input
-                    id="zipCode"
-                    type="text"
-                    placeholder="12345"
-                    value={zipCode}
-                    onChange={handleZipCodeChange}
-                    onPaste={handleZipCodePaste}
-                    maxLength={5}
-                    className="mt-1 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 border-slate-200 dark:border-slate-700"
-                    autoComplete="off"
-                  />
-                </div>
-
-                <div className="flex items-center space-x-2 pt-4 border-t border-slate-200 dark:border-slate-700">
-                  <Checkbox
-                    id="doNotRenew"
-                    checked={doNotRenew}
-                    onCheckedChange={setDoNotRenew}
-                    className="border-slate-300 dark:border-slate-600 data-[state=checked]:bg-indigo-600 data-[state=checked]:dark:bg-indigo-500 data-[state=checked]:text-white"
-                  />
-                  <label
-                    htmlFor="doNotRenew"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer text-slate-700 dark:text-slate-300"
+                <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
+                  <Button
+                    onClick={handleActivateSubscription}
+                    disabled={activating}
+                    className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 dark:from-indigo-500 dark:to-purple-500 dark:hover:from-indigo-600 dark:hover:to-purple-600 text-white text-lg py-6"
                   >
-                    Do NOT renew automatically
-                  </label>
+                    {activating ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="w-5 h-5 mr-2" />
+                        Continue to Payment
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-3">
+                    Secure payment powered by Stripe
+                  </p>
                 </div>
-
-                {showButton && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Button
-                      onClick={handleActivateSubscription}
-                      disabled={activating}
-                      className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 dark:from-indigo-500 dark:to-purple-500 dark:hover:from-indigo-600 dark:hover:to-purple-600 text-white text-lg py-6"
-                    >
-                      {activating ? (
-                        <>Activating...</>
-                      ) : (
-                        <>
-                          <Sparkles className="w-5 h-5 mr-2" />
-                          Let Me In!
-                        </>
-                      )}
-                    </Button>
-                  </motion.div>
-                )}
 
                 <p className="text-xs text-slate-500 dark:text-slate-400 text-center pt-4">
                   By subscribing, you agree to our terms of service. Your subscription will be active 
