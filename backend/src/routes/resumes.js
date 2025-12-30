@@ -53,6 +53,24 @@ router.post('/', async (req, res) => {
     if (!title || !source_type) {
       return res.status(400).json({ error: 'Title and source_type are required' });
     }
+
+    // Check subscription status for resume limit
+    const isSubscribed = req.user.is_subscribed &&
+      (!req.user.subscription_end_date || new Date(req.user.subscription_end_date) > new Date());
+
+    if (!isSubscribed) {
+      // Free users are limited to 1 resume
+      const countResult = await query('SELECT COUNT(*) FROM resumes WHERE created_by = $1', [req.user.id]);
+      const resumeCount = parseInt(countResult.rows[0].count);
+
+      if (resumeCount >= 1) {
+        return res.status(403).json({
+          error: 'Resume limit reached. Upgrade to Premium to create unlimited resumes.',
+          requiresSubscription: true
+        });
+      }
+    }
+
     const result = await query('INSERT INTO resumes (title, status, source_type, file_url, last_edited_step, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *', [title, status, source_type, file_url, last_edited_step, req.user.id]);
     res.status(201).json(result.rows[0]);
   } catch (error) {

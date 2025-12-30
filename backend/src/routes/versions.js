@@ -1,9 +1,10 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, requireSubscription } from '../middleware/auth.js';
 
 const router = express.Router();
 router.use(authenticate);
+router.use(requireSubscription); // Version history is a premium feature
 
 router.get('/', async (req, res) => {
   try {
