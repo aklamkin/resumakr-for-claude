@@ -24,6 +24,8 @@ import couponRoutes from './routes/coupons.js';
 import campaignRoutes from './routes/campaigns.js';
 import settingsRoutes from './routes/settings.js';
 import usersRoutes from './routes/users.js';
+import paymentRoutes from './routes/payments.js';
+import webhookRoutes from './routes/webhooks.js';
 
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFound } from './middleware/notFound.js';
@@ -59,6 +61,9 @@ const limiter = rateLimit({
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100
 });
 app.use('/api/', limiter);
+
+// Webhook routes MUST come before express.json() to get raw body
+app.use('/api/webhooks', webhookRoutes);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -100,6 +105,7 @@ app.use('/api/versions', versionRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/prompts', promptRoutes);
 app.use('/api/providers', providerRoutes);
 app.use('/api/faq', faqRoutes);
