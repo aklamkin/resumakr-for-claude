@@ -92,9 +92,49 @@ export default function Pricing() {
     }
   }, [plans, selectedPlan]);
 
-  const handlePlanSelect = (planId) => {
+  const handlePlanSelect = async (planId) => {
+    // Check if user is logged in
+    if (!currentUser) {
+      navigate('/login?returnUrl=Pricing');
+      return;
+    }
+
     setSelectedPlan(planId);
-    setShowPaymentForm(true);
+    setActivating(true);
+
+    try {
+      // Get the base URL from environment or current window location
+      const frontendUrl = import.meta.env.VITE_FRONTEND_URL || window.location.origin;
+
+      // Create Stripe Checkout session
+      const response = await fetch('/api/payments/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('resumakr_token')}`
+        },
+        body: JSON.stringify({
+          plan_id: planId,
+          coupon_code: null, // Coupons can be entered in Stripe Checkout
+          success_url: `${frontendUrl}/subscription-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${frontendUrl}/pricing?canceled=true`
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create checkout session');
+      }
+
+      const data = await response.json();
+
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+    } catch (err) {
+      console.error("Error creating checkout session:", err);
+      alert(err.message || "Failed to start checkout. Please try again.");
+      setActivating(false);
+    }
   };
 
   const handleValidateCoupon = async () => {
