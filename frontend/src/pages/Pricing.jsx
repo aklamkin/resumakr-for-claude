@@ -107,7 +107,8 @@ export default function Pricing() {
       const frontendUrl = import.meta.env.VITE_FRONTEND_URL || window.location.origin;
 
       // Create Stripe Checkout session
-      const response = await fetch('/api/payments/create-checkout-session', {
+      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      const response = await fetch(`${apiUrl}/payments/create-checkout-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -221,7 +222,8 @@ export default function Pricing() {
       const frontendUrl = import.meta.env.VITE_FRONTEND_URL || window.location.origin;
 
       // Create Stripe Checkout session
-      const response = await fetch('/api/payments/create-checkout-session', {
+      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      const response = await fetch(`${apiUrl}/payments/create-checkout-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
