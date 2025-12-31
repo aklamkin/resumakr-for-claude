@@ -1,12 +1,25 @@
 import Stripe from 'stripe';
 import { query } from '../config/database.js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Initialize Stripe only if API key is provided
+// This prevents the app from crashing if Stripe is not configured yet
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY)
+  : null;
+
+// Helper to check if Stripe is configured
+function ensureStripeConfigured() {
+  if (!stripe) {
+    throw new Error('Stripe is not configured. Please set STRIPE_SECRET_KEY in environment variables.');
+  }
+}
 
 /**
  * Get or create a Stripe customer for a user
  */
 export async function getOrCreateCustomer(userId, email, fullName) {
+  ensureStripeConfigured();
+
   // Check if user already has a Stripe customer ID
   const userResult = await query('SELECT stripe_customer_id FROM users WHERE id = $1', [userId]);
 
@@ -115,6 +128,8 @@ export async function createCheckoutSession({
  * Create a billing portal session for subscription management
  */
 export async function createBillingPortalSession(userId, returnUrl) {
+  ensureStripeConfigured();
+
   const userResult = await query('SELECT stripe_customer_id FROM users WHERE id = $1', [userId]);
 
   if (!userResult.rows[0]?.stripe_customer_id) {
@@ -133,6 +148,8 @@ export async function createBillingPortalSession(userId, returnUrl) {
  * Cancel a subscription
  */
 export async function cancelSubscription(userId) {
+  ensureStripeConfigured();
+
   const userResult = await query('SELECT stripe_subscription_id FROM users WHERE id = $1', [userId]);
 
   if (!userResult.rows[0]?.stripe_subscription_id) {
@@ -154,6 +171,8 @@ export async function cancelSubscription(userId) {
  * Verify webhook signature
  */
 export function verifyWebhookSignature(payload, signature) {
+  ensureStripeConfigured();
+
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
   return stripe.webhooks.constructEvent(payload, signature, endpointSecret);
 }
