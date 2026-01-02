@@ -182,13 +182,18 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
         }
       `}</style>
       
-      <Sidebar>
+      <Sidebar collapsible="icon">
         <SidebarHeader className="border-b px-4 py-3">
-          <div className="flex items-center gap-2">
-            <FileCheck className="h-6 w-6 text-accent" />
-            <h1 className="text-xl font-bold">Resumakr</h1>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <FileCheck className="h-6 w-6 text-accent" />
+              <div className="group-data-[collapsible=icon]:hidden">
+                <h1 className="text-xl font-bold">Resumakr</h1>
+                <p className="text-sm text-muted-foreground">Build Your Future</p>
+              </div>
+            </div>
+            <SidebarTrigger className="-mr-1" />
           </div>
-          <p className="text-sm text-muted-foreground mt-1">Build Your Future</p>
         </SidebarHeader>
 
         <SidebarContent>
@@ -274,13 +279,24 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                   </div>
                   <Button
                     onClick={handleSubscriptionClick}
-                    className="w-full"
+                    className="w-full text-left justify-start"
                     size="sm"
                     variant={subscriptionInfo?.isActive ? "outline" : "default"}
                   >
-                    {subscriptionInfo?.isActive
-                      ? `${subscriptionInfo.plan ? subscriptionInfo.plan.charAt(0).toUpperCase() + subscriptionInfo.plan.slice(1) : 'Active'} Plan`
-                      : 'Upgrade Plan'}
+                    {subscriptionInfo?.isActive ? (
+                      <div className="flex flex-col items-start w-full">
+                        <span className="font-medium">
+                          {subscriptionInfo.plan ? subscriptionInfo.plan.charAt(0).toUpperCase() + subscriptionInfo.plan.slice(1) : 'Active'} Plan
+                        </span>
+                        {subscriptionInfo.endDate && (
+                          <span className="text-xs opacity-70">
+                            Expires {formatDateWithYear(subscriptionInfo.endDate)}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      'Subscribe to activate'
+                    )}
                   </Button>
                 </div>
               ) : (
@@ -300,16 +316,6 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
       </Sidebar>
 
       <main className="flex-1 overflow-auto">
-        <div className="border-b px-4 py-3 flex items-center justify-between bg-background">
-          <SidebarTrigger />
-          <div className="flex items-center gap-4">
-            {!loading && !user && (
-              <Button asChild size="sm">
-                <Link to="/login">Log In</Link>
-              </Button>
-            )}
-          </div>
-        </div>
         {children}
       </main>
     </SidebarProvider>
