@@ -79,7 +79,9 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
         callbackURL: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/auth/google/callback`,
-        scope: ['profile', 'email']
+        scope: ['profile', 'email'],
+        // Force account selection every time to prevent caching
+        prompt: 'select_account'
       },
       async (accessToken, refreshToken, profile, done) => {
         try {

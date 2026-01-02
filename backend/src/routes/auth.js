@@ -156,7 +156,10 @@ router.post('/change-password', authenticate, async (req, res) => {
 // ====================================
 
 // Google OAuth - Initiate
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+router.get('/google', passport.authenticate('google', {
+  scope: ['profile', 'email'],
+  prompt: 'select_account'  // Force account selection to prevent caching
+}));
 
 // Google OAuth - Callback
 router.get(
