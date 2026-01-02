@@ -126,6 +126,14 @@ export default function SettingsProviders() {
     setLoadingModels(true);
     try {
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+
+      if (!response.ok) {
+        console.error('Gemini API returned error:', response.status);
+        setGeminiModels(GEMINI_MODELS_FALLBACK);
+        showNotification('Failed to fetch models from Gemini API, using fallback list', 'Info', 'info');
+        return;
+      }
+
       const data = await response.json();
 
       if (!data.models) {
