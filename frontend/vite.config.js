@@ -4,12 +4,13 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  // Log environment variables during build
+  // Log environment variables during build - debugging blank page issue
   console.log('=== VITE BUILD ENVIRONMENT ===');
   console.log('Mode:', mode);
   console.log('VITE_API_URL:', process.env.VITE_API_URL);
   console.log('VITE_STRIPE_PUBLISHABLE_KEY:', process.env.VITE_STRIPE_PUBLISHABLE_KEY);
   console.log('NODE_ENV:', process.env.NODE_ENV);
+  console.log('All env vars:', Object.keys(process.env).filter(k => k.startsWith('VITE_')));
   console.log('==============================');
 
   return {
