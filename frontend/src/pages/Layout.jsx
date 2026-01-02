@@ -279,7 +279,7 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                     variant={subscriptionInfo?.isActive ? "outline" : "default"}
                   >
                     {subscriptionInfo?.isActive
-                      ? `${subscriptionInfo.plan.charAt(0).toUpperCase() + subscriptionInfo.plan.slice(1)} Plan`
+                      ? `${subscriptionInfo.plan ? subscriptionInfo.plan.charAt(0).toUpperCase() + subscriptionInfo.plan.slice(1) : 'Active'} Plan`
                       : 'Upgrade Plan'}
                   </Button>
                 </div>
