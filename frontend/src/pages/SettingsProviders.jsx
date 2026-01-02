@@ -211,7 +211,8 @@ export default function SettingsProviders() {
       showNotification("Provider added successfully!", "Success");
     },
     onError: (error) => {
-      showNotification("Failed to add provider.", "Error", "error");
+      const errorMessage = error.response?.data?.error || error.message || "Failed to add provider";
+      showNotification(errorMessage, "Error", "error");
     }
   });
 
@@ -224,7 +225,8 @@ export default function SettingsProviders() {
       showNotification("Provider updated successfully!", "Success");
     },
     onError: (error) => {
-      showNotification("Failed to update provider.", "Error", "error");
+      const errorMessage = error.response?.data?.error || error.message || "Failed to update provider";
+      showNotification(errorMessage, "Error", "error");
     }
   });
 
