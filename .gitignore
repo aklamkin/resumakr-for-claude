@@ -1,10 +1,14 @@
-# Environment variables
+# Environment variables (production secrets)
 .env
-.env.local
-.env.production
-.env.development
-backend/.env
 frontend/.env
+
+# Local development env files (auto-loaded by Vite)
+.env.local
+.env.development
+
+# Temporary Railway setup files
+railway-env-*.txt
+setup-stripe-products.sh
 
 # Dependencies
 node_modules/

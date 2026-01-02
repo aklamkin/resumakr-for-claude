@@ -1,5 +1,9 @@
 version: '3.8'
 
+# Simplified local development setup - mirrors Railway production architecture
+# Backend and frontend run natively (npm run dev), only PostgreSQL in Docker
+# This ensures dev-prod parity for easier troubleshooting
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -19,49 +23,5 @@ services:
       timeout: 5s
       retries: 5
 
-  backend:
-    build: ./backend
-    container_name: resumakr-api
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      NODE_ENV: development
-      PORT: 3001
-      DATABASE_URL: postgresql://resumakr_user:${DB_PASSWORD}@postgres:5432/resumakr
-      JWT_SECRET: ${JWT_SECRET}
-      SESSION_SECRET: ${SESSION_SECRET}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      FILE_STORAGE: local
-      UPLOAD_DIR: /app/uploads
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
-      BACKEND_URL: ${BACKEND_URL:-http://localhost:3001}
-      BCRYPT_ROUNDS: 10
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
-    volumes:
-      - uploads:/app/uploads
-    ports:
-      - "3001:3001"
-
-  frontend:
-    build:
-      context: ./frontend
-      args:
-        VITE_API_URL: /api
-    container_name: resumakr-frontend
-    restart: unless-stopped
-    depends_on:
-      - backend
-    ports:
-      - "5173:80"
-    volumes:
-      - uploads:/usr/share/nginx/html/uploads:ro
-
 volumes:
   postgres_data:
-  uploads:
