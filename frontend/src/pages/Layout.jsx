@@ -360,19 +360,19 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
         {/* Footer */}
         <SidebarFooter className="border-t border-border/50 bg-muted/30 p-0">
           {/* Theme Toggle */}
-          <div className="px-4 py-3 border-b border-border/50">
+          <div className="px-4 py-3 border-b border-border/50 group-data-[collapsible=icon]:px-2">
             <ThemeToggle />
           </div>
 
           {/* User Section */}
-          <div className="p-4">
+          <div className="p-4 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:py-3">
             {!loading && (
               <>
                 {user ? (
-                  <div className="space-y-3">
+                  <div className="space-y-3 group-data-[collapsible=icon]:space-y-2">
                     {/* User Profile */}
-                    <div className="flex items-center gap-3">
-                      <div className="avatar-gradient h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0 group-data-[collapsible=icon]:mx-auto">
+                    <div className="flex items-center gap-3 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-0">
+                      <div className="avatar-gradient h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0">
                         {getUserInitials(user)}
                       </div>
                       <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
@@ -395,14 +395,14 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                       onClick={handleSubscriptionClick}
                       className={cn(
                         "w-full h-auto p-3 rounded-lg transition-all sidebar-transition",
-                        "group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:p-2",
+                        "group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center",
                         subscriptionInfo?.isActive
                           ? "subscription-card-active text-white hover:shadow-lg hover:scale-[1.02]"
                           : "subscription-card hover:shadow-md hover:border-accent/40"
                       )}
                       variant="ghost"
                     >
-                      <div className="flex items-center gap-2 w-full">
+                      <div className="flex items-center gap-2 w-full group-data-[collapsible=icon]:w-auto">
                         {subscriptionInfo?.isActive ? (
                           <>
                             <Crown className="h-4 w-4 flex-shrink-0" />
