@@ -18,7 +18,6 @@ import {
   SidebarHeader,
   SidebarFooter,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -248,20 +247,17 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
         }
       `}</style>
 
-      <Sidebar collapsible="icon" className="border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <Sidebar className="border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         {/* Header */}
         <SidebarHeader className="border-b border-border/50 bg-muted/30 px-4 py-4">
-          <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-            <div className="flex items-center gap-3 min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 shadow-md flex-shrink-0">
-                <FileCheck className="h-5 w-5 text-white" />
-              </div>
-              <div className="group-data-[collapsible=icon]:hidden min-w-0">
-                <h1 className="text-lg font-bold tracking-tight">Resumakr</h1>
-                <p className="text-xs text-muted-foreground">Build Your Future</p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 shadow-md flex-shrink-0">
+              <FileCheck className="h-5 w-5 text-white" />
             </div>
-            <SidebarTrigger className="h-8 w-8 flex-shrink-0 hover:bg-muted rounded-md transition-colors group-data-[collapsible=icon]:hidden" />
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold tracking-tight">Resumakr</h1>
+              <p className="text-xs text-muted-foreground">Build Your Future</p>
+            </div>
           </div>
         </SidebarHeader>
 
@@ -287,7 +283,7 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                       >
                         <Link to={item.url} className="flex items-center">
                           <item.icon className="h-4 w-4 flex-shrink-0" />
-                          <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
+                          <span>{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -306,15 +302,14 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                   className={cn(
                     "flex w-full items-center justify-between h-10 px-3 rounded-lg",
                     "text-sm font-semibold transition-all sidebar-transition",
-                    "hover:bg-muted/70 hover:text-foreground",
-                    "group-data-[collapsible=icon]:justify-center"
+                    "hover:bg-muted/70 hover:text-foreground"
                   )}
                 >
                   <div className="flex items-center gap-3">
                     <SettingsIcon className="h-4 w-4 flex-shrink-0" />
-                    <span className="group-data-[collapsible=icon]:hidden">Admin Settings</span>
+                    <span>Admin Settings</span>
                   </div>
-                  <div className="group-data-[collapsible=icon]:hidden">
+                  <div>
                     {settingsExpanded ? (
                       <ChevronDown className="h-4 w-4 transition-transform" />
                     ) : (
@@ -336,15 +331,14 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                             isActive={isActive}
                             className={cn(
                               "nav-item-hover h-9 px-3 gap-3 rounded-lg transition-all sidebar-transition",
-                              "hover:bg-muted/70 hover:text-foreground text-sm",
-                              "pl-6 group-data-[collapsible=icon]:pl-3",
+                              "hover:bg-muted/70 hover:text-foreground text-sm pl-6",
                               isActive && "bg-muted text-foreground font-medium"
                             )}
                             data-active={isActive}
                           >
                             <Link to={item.url} className="flex items-center">
                               <item.icon className="h-3.5 w-3.5 flex-shrink-0" />
-                              <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
+                              <span>{item.title}</span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -360,22 +354,22 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
         {/* Footer */}
         <SidebarFooter className="border-t border-border/50 bg-muted/30 p-0">
           {/* Theme Toggle */}
-          <div className="px-4 py-3 border-b border-border/50 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-4 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+          <div className="px-4 py-3 border-b border-border/50">
             <ThemeToggle />
           </div>
 
           {/* User Section */}
-          <div className="p-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-3 group-data-[collapsible=icon]:space-y-4">
+          <div className="p-4">
             {!loading && (
               <>
                 {user ? (
-                  <div className="space-y-3 group-data-[collapsible=icon]:space-y-2">
+                  <div className="space-y-3">
                     {/* User Profile */}
-                    <div className="flex items-center gap-3 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-0">
+                    <div className="flex items-center gap-3">
                       <div className="avatar-gradient h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0">
                         {getUserInitials(user)}
                       </div>
-                      <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+                      <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{user.full_name || user.email}</p>
                         <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                       </div>
@@ -383,7 +377,7 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                         variant="ghost"
                         size="icon"
                         onClick={handleLogout}
-                        className="h-8 w-8 flex-shrink-0 hover:bg-destructive/10 hover:text-destructive transition-colors group-data-[collapsible=icon]:hidden"
+                        className="h-8 w-8 flex-shrink-0 hover:bg-destructive/10 hover:text-destructive transition-colors"
                         title="Logout"
                       >
                         <LogOut className="h-4 w-4" />
@@ -395,18 +389,17 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                       onClick={handleSubscriptionClick}
                       className={cn(
                         "w-full h-auto p-3 rounded-lg transition-all sidebar-transition",
-                        "group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:h-auto group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:hover:bg-transparent group-data-[collapsible=icon]:shadow-none group-data-[collapsible=icon]:border-0",
                         subscriptionInfo?.isActive
-                          ? "subscription-card-active text-white hover:shadow-lg hover:scale-[1.02] group-data-[collapsible=icon]:text-foreground"
+                          ? "subscription-card-active text-white hover:shadow-lg hover:scale-[1.02]"
                           : "subscription-card hover:shadow-md hover:border-accent/40"
                       )}
                       variant="ghost"
                     >
-                      <div className="flex items-center gap-2 w-full group-data-[collapsible=icon]:w-auto">
+                      <div className="flex items-center gap-2 w-full">
                         {subscriptionInfo?.isActive ? (
                           <>
                             <Crown className="h-4 w-4 flex-shrink-0" />
-                            <div className="flex flex-col items-start text-left flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+                            <div className="flex flex-col items-start text-left flex-1 min-w-0">
                               <span className="font-semibold text-sm">
                                 {subscriptionInfo.plan
                                   ? subscriptionInfo.plan.charAt(0).toUpperCase() + subscriptionInfo.plan.slice(1)
@@ -422,7 +415,7 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                         ) : (
                           <>
                             <Sparkles className="h-4 w-4 flex-shrink-0 text-accent" />
-                            <span className="text-sm font-medium group-data-[collapsible=icon]:hidden">
+                            <span className="text-sm font-medium">
                               Subscribe to activate
                             </span>
                           </>
@@ -431,14 +424,14 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-2 flex flex-col group-data-[collapsible=icon]:items-center">
-                    <Button asChild className="w-full h-9 rounded-lg shadow-sm group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center" size="sm">
+                  <div className="space-y-2 flex flex-col">
+                    <Button asChild className="w-full h-9 rounded-lg shadow-sm" size="sm">
                       <Link to="/login" className="flex items-center justify-center gap-2">
-                        <User className="h-4 w-4 group-data-[collapsible=icon]:m-0" />
-                        <span className="group-data-[collapsible=icon]:sr-only">Sign In</span>
+                        <User className="h-4 w-4" />
+                        <span>Sign In</span>
                       </Link>
                     </Button>
-                    <Button asChild variant="outline" className="w-full h-9 rounded-lg group-data-[collapsible=icon]:hidden" size="sm">
+                    <Button asChild variant="outline" className="w-full h-9 rounded-lg" size="sm">
                       <Link to="/signup">Sign Up</Link>
                     </Button>
                   </div>
