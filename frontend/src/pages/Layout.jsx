@@ -247,7 +247,7 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
         }
       `}</style>
 
-      <Sidebar className="border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <Sidebar collapsible="none" className="border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         {/* Header */}
         <SidebarHeader className="border-b border-border/50 bg-muted/30 px-4 py-4">
           <div className="flex items-center gap-3">
