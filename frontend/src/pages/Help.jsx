@@ -53,16 +53,6 @@ export default function Help() {
   }, {});
 
   const onSubmit = async (data) => {
-    if (!helpConfig?.recipient_emails || helpConfig.recipient_emails.length === 0) {
-      setNotification({
-        open: true,
-        title: "Configuration Error",
-        message: "Contact form is not properly configured. Please contact an administrator.",
-        type: "error"
-      });
-      return;
-    }
-
     setSubmitting(true);
     try {
       // Send email to all configured recipients
@@ -160,7 +150,7 @@ export default function Help() {
         )}
 
         {/* Contact Form */}
-        {helpConfig?.contact_form_enabled && (
+        {helpConfig?.contact_form_enabled && helpConfig?.recipient_emails?.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
