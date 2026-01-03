@@ -81,7 +81,7 @@ export default function ThemeToggle() {
       variant="outline"
       size="sm"
       onClick={cycleTheme}
-      className="w-full justify-start gap-2 h-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto"
+      className="w-full justify-start gap-2 h-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:h-auto group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:hover:bg-transparent group-data-[collapsible=icon]:shadow-none"
     >
       {getIcon()}
       <span className="text-sm group-data-[collapsible=icon]:sr-only">Theme: {getLabel()}</span>

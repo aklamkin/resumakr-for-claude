@@ -360,12 +360,12 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
         {/* Footer */}
         <SidebarFooter className="border-t border-border/50 bg-muted/30 p-0">
           {/* Theme Toggle */}
-          <div className="px-4 py-3 border-b border-border/50 group-data-[collapsible=icon]:px-2">
+          <div className="px-4 py-3 border-b border-border/50 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-4 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
             <ThemeToggle />
           </div>
 
           {/* User Section */}
-          <div className="p-4 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:py-3">
+          <div className="p-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-3 group-data-[collapsible=icon]:space-y-4">
             {!loading && (
               <>
                 {user ? (
@@ -395,9 +395,9 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                       onClick={handleSubscriptionClick}
                       className={cn(
                         "w-full h-auto p-3 rounded-lg transition-all sidebar-transition",
-                        "group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center",
+                        "group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:h-auto group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:hover:bg-transparent group-data-[collapsible=icon]:shadow-none group-data-[collapsible=icon]:border-0",
                         subscriptionInfo?.isActive
-                          ? "subscription-card-active text-white hover:shadow-lg hover:scale-[1.02]"
+                          ? "subscription-card-active text-white hover:shadow-lg hover:scale-[1.02] group-data-[collapsible=icon]:text-foreground"
                           : "subscription-card hover:shadow-md hover:border-accent/40"
                       )}
                       variant="ghost"
