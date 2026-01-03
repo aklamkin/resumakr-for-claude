@@ -251,8 +251,8 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
       <Sidebar collapsible="icon" className="border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         {/* Header */}
         <SidebarHeader className="border-b border-border/50 bg-muted/30 px-4 py-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
+            <div className="flex items-center gap-3 min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 shadow-md flex-shrink-0">
                 <FileCheck className="h-5 w-5 text-white" />
               </div>
@@ -261,7 +261,7 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                 <p className="text-xs text-muted-foreground">Build Your Future</p>
               </div>
             </div>
-            <SidebarTrigger className="h-8 w-8 flex-shrink-0 hover:bg-muted rounded-md transition-colors" />
+            <SidebarTrigger className="h-8 w-8 flex-shrink-0 hover:bg-muted rounded-md transition-colors group-data-[collapsible=icon]:hidden" />
           </div>
         </SidebarHeader>
 
@@ -371,8 +371,8 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                 {user ? (
                   <div className="space-y-3">
                     {/* User Profile */}
-                    <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-                      <div className="avatar-gradient h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0">
+                    <div className="flex items-center gap-3">
+                      <div className="avatar-gradient h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0 group-data-[collapsible=icon]:mx-auto">
                         {getUserInitials(user)}
                       </div>
                       <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
@@ -395,14 +395,14 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                       onClick={handleSubscriptionClick}
                       className={cn(
                         "w-full h-auto p-3 rounded-lg transition-all sidebar-transition",
-                        "group-data-[collapsible=icon]:p-2",
+                        "group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:p-2",
                         subscriptionInfo?.isActive
                           ? "subscription-card-active text-white hover:shadow-lg hover:scale-[1.02]"
                           : "subscription-card hover:shadow-md hover:border-accent/40"
                       )}
                       variant="ghost"
                     >
-                      <div className="flex items-center gap-2 w-full group-data-[collapsible=icon]:justify-center">
+                      <div className="flex items-center gap-2 w-full">
                         {subscriptionInfo?.isActive ? (
                           <>
                             <Crown className="h-4 w-4 flex-shrink-0" />
@@ -431,11 +431,11 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <Button asChild className="w-full h-9 rounded-lg shadow-sm" size="sm">
-                      <Link to="/login">
-                        <span className="group-data-[collapsible=icon]:hidden">Sign In</span>
-                        <User className="h-4 w-4 hidden group-data-[collapsible=icon]:block" />
+                  <div className="space-y-2 flex flex-col group-data-[collapsible=icon]:items-center">
+                    <Button asChild className="w-full h-9 rounded-lg shadow-sm group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center" size="sm">
+                      <Link to="/login" className="flex items-center justify-center gap-2">
+                        <User className="h-4 w-4 group-data-[collapsible=icon]:m-0" />
+                        <span className="group-data-[collapsible=icon]:sr-only">Sign In</span>
                       </Link>
                     </Button>
                     <Button asChild variant="outline" className="w-full h-9 rounded-lg group-data-[collapsible=icon]:hidden" size="sm">
