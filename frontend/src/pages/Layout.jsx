@@ -2,10 +2,9 @@ import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import {
-  FileCheck, Home, Settings as SettingsIcon, LogOut, User,
+  FileCheck, Home, Settings as SettingsIcon, User,
   HelpCircle, DollarSign, Brain, FileText, Ticket, Tag,
-  TrendingUp, ChevronDown, ChevronRight, Monitor, Users,
-  Sparkles, Crown, Menu, X
+  TrendingUp, ChevronDown, ChevronRight, Monitor, Users
 } from "lucide-react";
 import {
   Sidebar,
@@ -19,11 +18,9 @@ import {
   SidebarFooter,
   SidebarProvider,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import api from "@/api/apiClient";
 import ThemeToggle from "../components/ThemeToggle";
-import { formatDateWithYear } from "../components/utils/dateUtils";
 
 const navigationItems = [
   {
@@ -98,21 +95,9 @@ const settingsItems = [
   },
 ];
 
-// Get user initials from email or name
-const getUserInitials = (user) => {
-  if (!user) return "U";
-  if (user.full_name) {
-    const names = user.full_name.split(" ");
-    return names.map(n => n[0]).join("").toUpperCase().slice(0, 2);
-  }
-  return user.email?.slice(0, 2).toUpperCase() || "U";
-};
-
 export default function Layout({ children, currentPageName, isPublicPage }) {
   const location = useLocation();
-  const navigate = useNavigate();
   const [user, setUser] = React.useState(null);
-  const [subscriptionInfo, setSubscriptionInfo] = React.useState(null);
   const [settingsExpanded, setSettingsExpanded] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
 
@@ -135,41 +120,12 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
 
       const userData = await api.auth.me();
       setUser(userData);
-
-      if (userData.is_subscribed && userData.subscription_end_date) {
-        const endDate = new Date(userData.subscription_end_date);
-        const now = new Date();
-        const isActive = endDate > now;
-
-        setSubscriptionInfo({
-          isActive,
-          plan: userData.subscription_plan,
-          endDate: userData.subscription_end_date
-        });
-
-        if (!isActive) {
-          await api.auth.updateMe({ is_subscribed: false });
-        }
-      } else {
-        setSubscriptionInfo({ isActive: false });
-      }
     } catch (err) {
       console.error("Error loading user:", err);
       setUser(null);
-      setSubscriptionInfo({ isActive: false });
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    api.auth.logout();
-    setUser(null);
-    setSubscriptionInfo(null);
-  };
-
-  const handleSubscriptionClick = () => {
-    navigate(createPageUrl("SubscriptionManagement"));
   };
 
   const isAdmin = user?.role === 'admin';
@@ -351,94 +307,9 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
           )}
         </SidebarContent>
 
-        {/* Footer */}
-        <SidebarFooter className="border-t border-border/50 bg-muted/30 p-0">
-          {/* Theme Toggle */}
-          <div className="px-4 py-3 border-b border-border/50">
-            <ThemeToggle />
-          </div>
-
-          {/* User Section */}
-          <div className="p-4">
-            {!loading && (
-              <>
-                {user ? (
-                  <div className="space-y-3">
-                    {/* User Profile */}
-                    <div className="flex items-center gap-3">
-                      <div className="avatar-gradient h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0">
-                        {getUserInitials(user)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{user.full_name || user.email}</p>
-                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleLogout}
-                        className="h-8 w-8 flex-shrink-0 hover:bg-destructive/10 hover:text-destructive transition-colors"
-                        title="Logout"
-                      >
-                        <LogOut className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {/* Subscription Card */}
-                    <Button
-                      onClick={handleSubscriptionClick}
-                      className={cn(
-                        "w-full h-auto p-3 rounded-lg transition-all sidebar-transition",
-                        subscriptionInfo?.isActive
-                          ? "subscription-card-active text-white hover:shadow-lg hover:scale-[1.02]"
-                          : "subscription-card hover:shadow-md hover:border-accent/40"
-                      )}
-                      variant="ghost"
-                    >
-                      <div className="flex items-center gap-2 w-full">
-                        {subscriptionInfo?.isActive ? (
-                          <>
-                            <Crown className="h-4 w-4 flex-shrink-0" />
-                            <div className="flex flex-col items-start text-left flex-1 min-w-0">
-                              <span className="font-semibold text-sm">
-                                {subscriptionInfo.plan
-                                  ? subscriptionInfo.plan.charAt(0).toUpperCase() + subscriptionInfo.plan.slice(1)
-                                  : 'Premium'} Plan
-                              </span>
-                              {subscriptionInfo.endDate && (
-                                <span className="text-xs opacity-90">
-                                  Until {formatDateWithYear(subscriptionInfo.endDate)}
-                                </span>
-                              )}
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-4 w-4 flex-shrink-0 text-accent" />
-                            <span className="text-sm font-medium">
-                              Subscribe to activate
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-2 flex flex-col">
-                    <Button asChild className="w-full h-9 rounded-lg shadow-sm" size="sm">
-                      <Link to="/login" className="flex items-center justify-center gap-2">
-                        <User className="h-4 w-4" />
-                        <span>Sign In</span>
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline" className="w-full h-9 rounded-lg" size="sm">
-                      <Link to="/signup">Sign Up</Link>
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+        {/* Footer - Sticky Theme Toggle */}
+        <SidebarFooter className="mt-auto border-t border-border/50 bg-muted/30 p-4">
+          <ThemeToggle />
         </SidebarFooter>
       </Sidebar>
 

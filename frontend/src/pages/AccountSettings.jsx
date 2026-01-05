@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import api from '@/api/apiClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Lock, Shield } from 'lucide-react';
+import { User, Lock, Shield, LogOut, Crown, Sparkles } from 'lucide-react';
+import { formatDateWithYear } from '../components/utils/dateUtils';
 
 export default function AccountSettings() {
+  const navigate = useNavigate();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -17,6 +20,11 @@ export default function AccountSettings() {
     queryKey: ['current-user'],
     queryFn: () => api.auth.me(),
   });
+
+  const handleLogout = () => {
+    localStorage.removeItem('resumakr_token');
+    navigate('/login');
+  };
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
@@ -149,33 +157,83 @@ export default function AccountSettings() {
         </Card>
 
         {/* Subscription Info */}
-        {user?.is_subscribed && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                <CardTitle>Subscription</CardTitle>
-              </div>
-              <CardDescription>Your subscription details</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Plan</Label>
-                <Input value={user?.subscription_plan || 'None'} disabled className="mt-1 capitalize" />
-              </div>
-              {user?.subscription_end_date && (
-                <div>
-                  <Label>Valid Until</Label>
-                  <Input 
-                    value={new Date(user.subscription_end_date).toLocaleDateString()} 
-                    disabled 
-                    className="mt-1" 
-                  />
-                </div>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              {user?.is_subscribed ? (
+                <Crown className="h-5 w-5 text-yellow-600" />
+              ) : (
+                <Sparkles className="h-5 w-5 text-muted-foreground" />
               )}
-            </CardContent>
-          </Card>
-        )}
+              <CardTitle>Subscription</CardTitle>
+            </div>
+            <CardDescription>
+              {user?.is_subscribed ? 'Your active subscription' : 'Manage your subscription'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label>Status</Label>
+              <div className="mt-1 flex items-center gap-2">
+                <div className={`h-2 w-2 rounded-full ${user?.is_subscribed ? 'bg-green-500' : 'bg-gray-400'}`} />
+                <span className="text-sm font-medium">
+                  {user?.is_subscribed ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <Label>Plan</Label>
+              <Input
+                value={user?.subscription_plan ? user.subscription_plan.charAt(0).toUpperCase() + user.subscription_plan.slice(1) : 'None'}
+                disabled
+                className="mt-1 capitalize"
+              />
+            </div>
+
+            {user?.subscription_end_date && (
+              <div>
+                <Label>Valid Until</Label>
+                <Input
+                  value={formatDateWithYear(user.subscription_end_date)}
+                  disabled
+                  className="mt-1"
+                />
+              </div>
+            )}
+
+            <div className="pt-2">
+              <Button
+                variant={user?.is_subscribed ? "outline" : "default"}
+                onClick={() => navigate('/pricing')}
+                className="w-full"
+              >
+                {user?.is_subscribed ? 'Manage Subscription' : 'Subscribe to Activate'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Logout */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <LogOut className="h-5 w-5" />
+              <CardTitle>Sign Out</CardTitle>
+            </div>
+            <CardDescription>Log out of your account</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="destructive"
+              onClick={handleLogout}
+              className="w-full"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Log Out
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
