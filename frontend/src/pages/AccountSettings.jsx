@@ -97,17 +97,18 @@ export default function AccountSettings() {
           </CardContent>
         </Card>
 
-        {/* Password Change */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Lock className="h-5 w-5" />
-              <CardTitle>Change Password</CardTitle>
-            </div>
-            <CardDescription>Update your password to keep your account secure</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleChangePassword} className="space-y-4">
+        {/* Password Change - Only for non-OAuth users */}
+        {!user?.oauth_provider && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Lock className="h-5 w-5" />
+                <CardTitle>Change Password</CardTitle>
+              </div>
+              <CardDescription>Update your password to keep your account secure</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleChangePassword} className="space-y-4">
               <div>
                 <Label htmlFor="current-password">Current Password</Label>
                 <Input
@@ -155,12 +156,13 @@ export default function AccountSettings() {
             </form>
           </CardContent>
         </Card>
+        )}
 
         {/* Subscription Info */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              {user?.is_subscribed ? (
+              {user?.is_subscribed && user?.subscription_plan && user?.subscription_end_date ? (
                 <Crown className="h-5 w-5 text-yellow-600" />
               ) : (
                 <Sparkles className="h-5 w-5 text-muted-foreground" />
@@ -168,16 +170,16 @@ export default function AccountSettings() {
               <CardTitle>Subscription</CardTitle>
             </div>
             <CardDescription>
-              {user?.is_subscribed ? 'Your active subscription' : 'Manage your subscription'}
+              {user?.is_subscribed && user?.subscription_plan ? 'Your active subscription' : 'Manage your subscription'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <Label>Status</Label>
               <div className="mt-1 flex items-center gap-2">
-                <div className={`h-2 w-2 rounded-full ${user?.is_subscribed ? 'bg-green-500' : 'bg-gray-400'}`} />
+                <div className={`h-2 w-2 rounded-full ${user?.is_subscribed && user?.subscription_plan ? 'bg-green-500' : 'bg-gray-400'}`} />
                 <span className="text-sm font-medium">
-                  {user?.is_subscribed ? 'Active' : 'Inactive'}
+                  {user?.is_subscribed && user?.subscription_plan ? 'Active' : 'Inactive'}
                 </span>
               </div>
             </div>
@@ -204,11 +206,11 @@ export default function AccountSettings() {
 
             <div className="pt-2">
               <Button
-                variant={user?.is_subscribed ? "outline" : "default"}
+                variant={user?.is_subscribed && user?.subscription_plan ? "outline" : "default"}
                 onClick={() => navigate('/pricing')}
                 className="w-full"
               >
-                {user?.is_subscribed ? 'Manage Subscription' : 'Subscribe to Activate'}
+                {user?.is_subscribed && user?.subscription_plan ? 'Manage Subscription' : 'Subscribe to Activate'}
               </Button>
             </div>
           </CardContent>

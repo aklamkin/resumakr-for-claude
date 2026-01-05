@@ -307,8 +307,8 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
           )}
         </SidebarContent>
 
-        {/* Footer - Sticky Theme Toggle */}
-        <SidebarFooter className="mt-auto border-t border-border/50 bg-muted/30 p-4">
+        {/* Footer - Theme Toggle at Bottom */}
+        <SidebarFooter className="border-t border-border/50 bg-muted/30 p-4">
           <ThemeToggle />
         </SidebarFooter>
       </Sidebar>
