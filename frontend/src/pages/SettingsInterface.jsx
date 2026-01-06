@@ -7,6 +7,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { NotificationPopup } from '../components/ui/notification';
+import ThemeToggle from '../components/ThemeToggle';
 import api from '../api/apiClient';
 
 export default function SettingsInterface() {
@@ -87,6 +88,22 @@ export default function SettingsInterface() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Appearance Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Appearance</h3>
+
+            <div className="p-4 border rounded-lg dark:border-slate-700 space-y-3">
+              <div className="space-y-0.5">
+                <Label>Theme</Label>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Choose your preferred color theme
+                </p>
+              </div>
+              <ThemeToggle />
+            </div>
+          </div>
+
+          {/* Notifications Section */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Notifications</h3>
 

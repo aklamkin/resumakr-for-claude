@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import api from "@/api/apiClient";
-import ThemeToggle from "../components/ThemeToggle";
 
 const navigationItems = [
   {
@@ -307,10 +306,6 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
           )}
         </SidebarContent>
 
-        {/* Footer - Theme Toggle Sticky to Bottom */}
-        <SidebarFooter className="mt-auto border-t border-border/50 bg-muted/30 p-4">
-          <ThemeToggle />
-        </SidebarFooter>
       </Sidebar>
 
       <main className="flex-1 overflow-auto bg-background">
