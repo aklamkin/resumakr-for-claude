@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Edit2, Sparkles, CheckCircle, ArrowUpDown, Zap, Crown, Rocket, Star, Loader2, DollarSign, Power } from "lucide-react";
+import { Plus, Trash2, Edit2, Sparkles, CheckCircle, ArrowUpDown, Zap, Crown, Rocket, Star, Loader2, DollarSign, Power, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const ICON_OPTIONS = {
@@ -168,6 +168,52 @@ const PlanForm = ({ onSubmit, formData, setFormData, editingPlan, handleGenerate
       />
       <Label className="text-slate-900 dark:text-slate-100 cursor-pointer">Active</Label>
     </div>
+
+    {editingPlan && (
+      <div className="p-4 border rounded-lg dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 space-y-3">
+        <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Stripe Integration</h4>
+        {editingPlan.stripe_product_id ? (
+          <>
+            <div className="space-y-1">
+              <Label className="text-xs text-slate-600 dark:text-slate-400">Product ID</Label>
+              <div className="flex items-center gap-2">
+                <code className="text-xs bg-white dark:bg-slate-800 px-2 py-1 rounded border font-mono text-slate-900 dark:text-slate-100">
+                  {editingPlan.stripe_product_id}
+                </code>
+                <a
+                  href={`https://dashboard.stripe.com/products/${editingPlan.stripe_product_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 dark:text-indigo-400 hover:underline text-xs flex items-center gap-1"
+                >
+                  View in Stripe <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-slate-600 dark:text-slate-400">Price ID</Label>
+              <div className="flex items-center gap-2">
+                <code className="text-xs bg-white dark:bg-slate-800 px-2 py-1 rounded border font-mono text-slate-900 dark:text-slate-100">
+                  {editingPlan.stripe_price_id}
+                </code>
+                <a
+                  href={`https://dashboard.stripe.com/prices/${editingPlan.stripe_price_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 dark:text-indigo-400 hover:underline text-xs flex items-center gap-1"
+                >
+                  View in Stripe <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded border border-amber-200 dark:border-amber-800">
+            ⚠️ Not synced with Stripe yet. Users cannot purchase this plan.
+          </div>
+        )}
+      </div>
+    )}
 
     <div>
       <div className="flex items-center justify-between mb-3">
@@ -680,7 +726,8 @@ Create content that flows beautifully across headlines, features, CTAs, and disc
                     </button>
                   </th>
                   <th className="px-4 py-3 text-left w-[12%] text-xs font-medium text-slate-700 dark:text-slate-300">Features</th>
-                  <th className="px-4 py-3 text-left w-[20%] text-xs font-medium text-slate-700 dark:text-slate-300">Status</th>
+                  <th className="px-4 py-3 text-left w-[15%] text-xs font-medium text-slate-700 dark:text-slate-300">Stripe</th>
+                  <th className="px-4 py-3 text-left w-[15%] text-xs font-medium text-slate-700 dark:text-slate-300">Status</th>
                   <th className="px-4 py-3 text-right w-[10%] text-xs font-medium text-slate-700 dark:text-slate-300">Actions</th>
                 </tr>
               </thead>
@@ -716,6 +763,28 @@ Create content that flows beautifully across headlines, features, CTAs, and disc
                             <div className="text-xs text-slate-600 dark:text-slate-400">
                               {plan.features?.length || 0} feature{(plan.features?.length || 0) !== 1 ? 's' : ''}
                             </div>
+                          </td>
+                          <td className="px-4 py-4 align-middle">
+                            {plan.stripe_price_id ? (
+                              <div className="flex items-center gap-2">
+                                <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                                  Synced
+                                </Badge>
+                                <a
+                                  href={`https://dashboard.stripe.com/prices/${plan.stripe_price_id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                                  title="View in Stripe Dashboard"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </a>
+                              </div>
+                            ) : (
+                              <Badge variant="outline" className="border-red-300 dark:border-red-700 text-red-700 dark:text-red-300">
+                                Not Synced
+                              </Badge>
+                            )}
                           </td>
                           <td className="px-4 py-4 align-middle">
                             <div className="flex flex-wrap gap-1">
@@ -770,7 +839,7 @@ Create content that flows beautifully across headlines, features, CTAs, and disc
                         </tr>
                       ) : (
                         <tr>
-                          <td colSpan={6} className="p-6 bg-indigo-50 dark:bg-indigo-950/30">
+                          <td colSpan={7} className="p-6 bg-indigo-50 dark:bg-indigo-950/30">
                             <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Edit Plan</h3>
                             <PlanForm 
                               onSubmit={handleSubmit}
