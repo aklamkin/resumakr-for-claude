@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../config/database.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
+import { syncPlanToStripe } from '../services/stripe.js';
 
 const router = express.Router();
 
@@ -23,15 +24,39 @@ router.get('/plans', async (req, res) => {
 router.post('/plans', authenticate, requireAdmin, async (req, res) => {
   try {
     const { plan_id, name, price, period, duration, features, is_popular, is_active } = req.body;
-    
+
     const result = await query(
       `INSERT INTO subscription_plans (plan_id, name, price, period, duration, features, is_popular, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [plan_id, name, price, period, duration, JSON.stringify(features || []), is_popular || false, is_active !== false]
     );
-    
-    res.status(201).json(result.rows[0]);
+
+    const newPlan = result.rows[0];
+
+    // Auto-sync to Stripe (non-blocking - don't fail plan creation if Stripe sync fails)
+    try {
+      const syncResult = await syncPlanToStripe(newPlan, { createIfMissing: true });
+
+      if (syncResult.stripe_product_id && syncResult.stripe_price_id) {
+        // Update plan with Stripe IDs
+        const updateResult = await query(
+          `UPDATE subscription_plans
+           SET stripe_product_id = $1, stripe_price_id = $2, updated_at = NOW()
+           WHERE id = $3
+           RETURNING *`,
+          [syncResult.stripe_product_id, syncResult.stripe_price_id, newPlan.id]
+        );
+
+        console.log(`Plan ${plan_id} synced with Stripe successfully`);
+        return res.status(201).json(updateResult.rows[0]);
+      }
+    } catch (stripeError) {
+      console.error('Stripe sync failed (non-fatal):', stripeError.message);
+      // Return plan anyway - admin can manually sync later
+    }
+
+    res.status(201).json(newPlan);
   } catch (error) {
     console.error('Create plan error:', error);
     if (isUniqueViolation(error)) {
@@ -46,23 +71,20 @@ router.put('/plans/:id', authenticate, requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { is_active } = req.body;
 
+    // Get existing plan for comparison
+    const existingPlanResult = await query('SELECT * FROM subscription_plans WHERE id = $1', [id]);
+
+    if (existingPlanResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+
+    const existingPlan = existingPlanResult.rows[0];
+
     // If trying to activate the plan, verify it's synced with Stripe
-    if (is_active === true) {
-      const existingPlanResult = await query(
-        'SELECT stripe_price_id FROM subscription_plans WHERE id = $1',
-        [id]
-      );
-
-      if (existingPlanResult.rows.length === 0) {
-        return res.status(404).json({ error: 'Plan not found' });
-      }
-
-      const existingPlan = existingPlanResult.rows[0];
-      if (!existingPlan.stripe_price_id) {
-        return res.status(400).json({
-          error: 'Cannot activate plan without Stripe integration. Create in Stripe first.'
-        });
-      }
+    if (is_active === true && !existingPlan.stripe_price_id) {
+      return res.status(400).json({
+        error: 'Cannot activate plan without Stripe integration. Create in Stripe first.'
+      });
     }
 
     // Only allow valid columns that exist in the database
@@ -88,7 +110,38 @@ router.put('/plans/:id', authenticate, requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Plan not found' });
     }
 
-    res.json(result.rows[0]);
+    const updatedPlan = result.rows[0];
+
+    // Auto-sync to Stripe if plan has Stripe IDs and sync-worthy fields changed
+    const syncWorthyFields = ['name', 'price', 'period', 'duration', 'is_active'];
+    const shouldSync = fields.some(field => syncWorthyFields.includes(field)) && existingPlan.stripe_product_id;
+
+    if (shouldSync) {
+      try {
+        const syncResult = await syncPlanToStripe(updatedPlan);
+
+        // If price changed, update the stripe_price_id
+        if (syncResult.priceChanged && syncResult.stripe_price_id) {
+          const finalResult = await query(
+            `UPDATE subscription_plans
+             SET stripe_price_id = $1, updated_at = NOW()
+             WHERE id = $2
+             RETURNING *`,
+            [syncResult.stripe_price_id, id]
+          );
+
+          console.log(`Plan ${updatedPlan.plan_id} synced with Stripe (price changed)`);
+          return res.json(finalResult.rows[0]);
+        }
+
+        console.log(`Plan ${updatedPlan.plan_id} synced with Stripe`);
+      } catch (stripeError) {
+        console.error('Stripe sync failed (non-fatal):', stripeError.message);
+        // Return updated plan anyway - admin can manually sync later
+      }
+    }
+
+    res.json(updatedPlan);
   } catch (error) {
     console.error('Update plan error:', error);
     if (isUniqueViolation(error)) {
@@ -128,16 +181,39 @@ router.post('/plans/:id/sync-stripe', authenticate, requireAdmin, async (req, re
 
     const plan = planResult.rows[0];
 
-    // TODO: Implement Stripe sync logic in Phase 2
-    // For now, return a placeholder response
-    return res.status(501).json({
-      error: 'Stripe sync not implemented yet. This will be added in Phase 2.',
-      plan: plan
+    // Sync to Stripe
+    const syncResult = await syncPlanToStripe(plan, { createIfMissing: true });
+
+    if (syncResult.error) {
+      return res.status(400).json({ error: syncResult.error });
+    }
+
+    // Update plan with Stripe IDs
+    const updateResult = await query(
+      `UPDATE subscription_plans
+       SET stripe_product_id = $1, stripe_price_id = $2, updated_at = NOW()
+       WHERE id = $3
+       RETURNING *`,
+      [syncResult.stripe_product_id, syncResult.stripe_price_id, id]
+    );
+
+    console.log(`Plan ${plan.plan_id} manually synced with Stripe`);
+
+    res.json({
+      message: 'Plan synced with Stripe successfully',
+      plan: updateResult.rows[0],
+      sync: {
+        created: syncResult.created,
+        updated: syncResult.updated,
+        priceChanged: syncResult.priceChanged
+      }
     });
 
   } catch (error) {
     console.error('Stripe sync error:', error);
-    res.status(500).json({ error: 'Failed to sync with Stripe' });
+    res.status(500).json({
+      error: error.message || 'Failed to sync with Stripe'
+    });
   }
 });
 

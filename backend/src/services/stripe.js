@@ -340,6 +340,195 @@ export async function handleInvoicePaymentSucceeded(invoice) {
   console.log(`Invoice payment succeeded for user ${userId}`);
 }
 
+/**
+ * Create a Stripe Product for a subscription plan
+ */
+export async function createStripeProduct(planData) {
+  ensureStripeConfigured();
+
+  const product = await stripe.products.create({
+    name: planData.name,
+    description: `${planData.name} - ${planData.duration} ${planData.period} access`,
+    metadata: {
+      plan_id: planData.plan_id,
+      resumakr_plan: 'true'
+    }
+  });
+
+  console.log(`Created Stripe product ${product.id} for plan ${planData.plan_id}`);
+  return product;
+}
+
+/**
+ * Create a Stripe Price for a product
+ */
+export async function createStripePrice(productId, planData) {
+  ensureStripeConfigured();
+
+  // Convert period to Stripe interval format
+  let interval = 'month';
+  let intervalCount = 1;
+
+  if (planData.period === 'day') {
+    interval = 'day';
+    intervalCount = planData.duration;
+  } else if (planData.period === 'week') {
+    interval = 'week';
+    intervalCount = planData.duration;
+  } else if (planData.period === 'month') {
+    interval = 'month';
+    intervalCount = planData.duration;
+  } else if (planData.period === 'year') {
+    interval = 'year';
+    intervalCount = planData.duration;
+  }
+
+  const price = await stripe.prices.create({
+    product: productId,
+    unit_amount: Math.round(parseFloat(planData.price) * 100), // Convert to cents
+    currency: 'usd',
+    recurring: {
+      interval: interval,
+      interval_count: intervalCount
+    },
+    metadata: {
+      plan_id: planData.plan_id
+    }
+  });
+
+  console.log(`Created Stripe price ${price.id} for product ${productId}`);
+  return price;
+}
+
+/**
+ * Update a Stripe Product
+ * Note: Price changes require creating a new price, not updating the product
+ */
+export async function updateStripeProduct(productId, planData) {
+  ensureStripeConfigured();
+
+  const product = await stripe.products.update(productId, {
+    name: planData.name,
+    description: `${planData.name} - ${planData.duration} ${planData.period} access`,
+    active: planData.is_active !== false
+  });
+
+  console.log(`Updated Stripe product ${productId} for plan ${planData.plan_id}`);
+  return product;
+}
+
+/**
+ * Archive a Stripe Price (makes it inactive)
+ */
+export async function archiveStripePrice(priceId) {
+  ensureStripeConfigured();
+
+  const price = await stripe.prices.update(priceId, {
+    active: false
+  });
+
+  console.log(`Archived Stripe price ${priceId}`);
+  return price;
+}
+
+/**
+ * Master sync function - creates or updates plan in Stripe
+ * Returns { stripe_product_id, stripe_price_id, created, updated }
+ */
+export async function syncPlanToStripe(planData, options = {}) {
+  ensureStripeConfigured();
+
+  const { createIfMissing = true } = options;
+  let product;
+  let price;
+  let created = false;
+  let updated = false;
+  let priceChanged = false;
+
+  try {
+    // Case 1: Plan has no Stripe IDs - create new product and price
+    if (!planData.stripe_product_id && createIfMissing) {
+      console.log(`Creating new Stripe product for plan ${planData.plan_id}`);
+      product = await createStripeProduct(planData);
+      price = await createStripePrice(product.id, planData);
+      created = true;
+
+      return {
+        stripe_product_id: product.id,
+        stripe_price_id: price.id,
+        created: true,
+        updated: false,
+        priceChanged: false
+      };
+    }
+
+    // Case 2: Plan has Stripe IDs - update existing
+    if (planData.stripe_product_id) {
+      // Update product (name, description, active status)
+      product = await updateStripeProduct(planData.stripe_product_id, planData);
+      updated = true;
+
+      // Check if we need to create a new price (price or billing period changed)
+      // We need to compare with the existing price in Stripe
+      if (planData.stripe_price_id) {
+        const existingPrice = await stripe.prices.retrieve(planData.stripe_price_id);
+        const newPriceAmount = Math.round(parseFloat(planData.price) * 100);
+
+        // Determine if period/duration changed
+        let newInterval = 'month';
+        let newIntervalCount = 1;
+        if (planData.period === 'day') {
+          newInterval = 'day';
+          newIntervalCount = planData.duration;
+        } else if (planData.period === 'week') {
+          newInterval = 'week';
+          newIntervalCount = planData.duration;
+        } else if (planData.period === 'month') {
+          newInterval = 'month';
+          newIntervalCount = planData.duration;
+        } else if (planData.period === 'year') {
+          newInterval = 'year';
+          newIntervalCount = planData.duration;
+        }
+
+        const priceAmountChanged = existingPrice.unit_amount !== newPriceAmount;
+        const intervalChanged = existingPrice.recurring.interval !== newInterval;
+        const intervalCountChanged = existingPrice.recurring.interval_count !== newIntervalCount;
+
+        if (priceAmountChanged || intervalChanged || intervalCountChanged) {
+          console.log(`Price/billing changed for plan ${planData.plan_id}, creating new Stripe price`);
+          // Archive old price
+          await archiveStripePrice(planData.stripe_price_id);
+          // Create new price
+          price = await createStripePrice(planData.stripe_product_id, planData);
+          priceChanged = true;
+        }
+      }
+
+      return {
+        stripe_product_id: planData.stripe_product_id,
+        stripe_price_id: price ? price.id : planData.stripe_price_id,
+        created: false,
+        updated: true,
+        priceChanged: priceChanged
+      };
+    }
+
+    // Case 3: No product ID and createIfMissing is false
+    return {
+      stripe_product_id: null,
+      stripe_price_id: null,
+      created: false,
+      updated: false,
+      error: 'Plan has no Stripe product ID and createIfMissing is false'
+    };
+
+  } catch (error) {
+    console.error('Stripe sync error:', error);
+    throw error;
+  }
+}
+
 export default {
   getOrCreateCustomer,
   createCheckoutSession,
@@ -350,5 +539,10 @@ export default {
   handleSubscriptionUpdated,
   handleSubscriptionDeleted,
   handlePaymentSucceeded,
-  handleInvoicePaymentSucceeded
+  handleInvoicePaymentSucceeded,
+  createStripeProduct,
+  createStripePrice,
+  updateStripeProduct,
+  archiveStripePrice,
+  syncPlanToStripe
 };
