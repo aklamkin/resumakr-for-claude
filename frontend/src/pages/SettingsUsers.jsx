@@ -49,6 +49,16 @@ export default function SettingsUsers() {
     }
   });
 
+  // Fetch subscription plans
+  const { data: subscriptionPlans = [] } = useQuery({
+    queryKey: ['subscription-plans'],
+    queryFn: async () => {
+      const response = await fetch('/api/subscriptions/plans');
+      if (!response.ok) throw new Error('Failed to fetch subscription plans');
+      return response.json();
+    }
+  });
+
   const createUserMutation = useMutation({
     mutationFn: (userData) => api.entities.Users.create(userData),
     onSuccess: () => {
@@ -126,12 +136,35 @@ export default function SettingsUsers() {
   };
 
   const handleUpdateUser = () => {
+    // Validate subscription fields - all three must be set together
+    const hasSubscription = selectedUser.is_subscribed;
+    const hasPlan = selectedUser.subscription_plan && selectedUser.subscription_plan !== 'none';
+    const hasEndDate = selectedUser.subscription_end_date;
+
+    if (hasSubscription && (!hasPlan || !hasEndDate)) {
+      showNotification(
+        'When marking a subscription as active, you must also set the Plan and Expiration Date',
+        'Validation Error',
+        'error'
+      );
+      return;
+    }
+
+    if ((hasPlan || hasEndDate) && !hasSubscription) {
+      showNotification(
+        'When setting a Plan or Expiration Date, you must also mark the subscription as active',
+        'Validation Error',
+        'error'
+      );
+      return;
+    }
+
     const updates = {
       email: selectedUser.email,
       full_name: selectedUser.full_name,
       role: selectedUser.role,
       is_subscribed: selectedUser.is_subscribed,
-      subscription_plan: selectedUser.subscription_plan,
+      subscription_plan: selectedUser.subscription_plan === 'none' ? null : selectedUser.subscription_plan,
       subscription_end_date: selectedUser.subscription_end_date,
       subscription_price: selectedUser.subscription_price
     };
@@ -453,9 +486,11 @@ export default function SettingsUsers() {
                     <SelectTrigger id="edit-subscription-plan"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="basic">Basic</SelectItem>
-                      <SelectItem value="pro">Pro</SelectItem>
-                      <SelectItem value="premium">Premium</SelectItem>
+                      {subscriptionPlans.map(plan => (
+                        <SelectItem key={plan.plan_id} value={plan.plan_id}>
+                          {plan.name} (${plan.price}/{plan.duration} {plan.period}{plan.duration > 1 ? 's' : ''})
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

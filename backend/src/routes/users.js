@@ -128,6 +128,28 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
       return res.status(403).json({ error: 'You cannot change your own admin role' });
     }
 
+    // Validate subscription fields - all three must be set together
+    const hasSubscription = is_subscribed === true;
+    const hasPlan = subscription_plan && subscription_plan !== null;
+    const hasEndDate = subscription_end_date && subscription_end_date !== null;
+
+    // Check if any subscription fields are being updated
+    const isUpdatingSubscription = is_subscribed !== undefined || subscription_plan !== undefined || subscription_end_date !== undefined;
+
+    if (isUpdatingSubscription) {
+      if (hasSubscription && (!hasPlan || !hasEndDate)) {
+        return res.status(400).json({
+          error: 'When marking a subscription as active, you must also provide the subscription plan and expiration date'
+        });
+      }
+
+      if ((hasPlan || hasEndDate) && !hasSubscription) {
+        return res.status(400).json({
+          error: 'When setting a subscription plan or expiration date, the subscription must be marked as active'
+        });
+      }
+    }
+
     // Build update query dynamically
     const updates = [];
     const params = [];
