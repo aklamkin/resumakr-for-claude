@@ -44,7 +44,27 @@ router.post('/plans', authenticate, requireAdmin, async (req, res) => {
 router.put('/plans/:id', authenticate, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    
+    const { is_active } = req.body;
+
+    // If trying to activate the plan, verify it's synced with Stripe
+    if (is_active === true) {
+      const existingPlanResult = await query(
+        'SELECT stripe_price_id FROM subscription_plans WHERE id = $1',
+        [id]
+      );
+
+      if (existingPlanResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Plan not found' });
+      }
+
+      const existingPlan = existingPlanResult.rows[0];
+      if (!existingPlan.stripe_price_id) {
+        return res.status(400).json({
+          error: 'Cannot activate plan without Stripe integration. Create in Stripe first.'
+        });
+      }
+    }
+
     // Only allow valid columns that exist in the database
     const validColumns = ['plan_id', 'name', 'price', 'period', 'duration', 'features', 'is_popular', 'is_active'];
     const fields = Object.keys(req.body).filter(key => validColumns.includes(key));
@@ -52,22 +72,22 @@ router.put('/plans/:id', authenticate, requireAdmin, async (req, res) => {
       const value = req.body[field];
       return typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
     });
-    
+
     if (fields.length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' });
     }
-    
+
     const setClause = fields.map((field, i) => `${field} = $${i + 1}`).join(', ');
-    
+
     const result = await query(
       `UPDATE subscription_plans SET ${setClause}, updated_at = NOW() WHERE id = $${fields.length + 1} RETURNING *`,
       [...values, id]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Plan not found' });
     }
-    
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Update plan error:', error);
@@ -91,6 +111,33 @@ router.delete('/plans/:id', authenticate, requireAdmin, async (req, res) => {
   } catch (error) {
     console.error('Delete plan error:', error);
     res.status(500).json({ error: 'Failed to delete plan' });
+  }
+});
+
+// Manual Stripe sync endpoint
+router.post('/plans/:id/sync-stripe', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get the plan
+    const planResult = await query('SELECT * FROM subscription_plans WHERE id = $1', [id]);
+
+    if (planResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+
+    const plan = planResult.rows[0];
+
+    // TODO: Implement Stripe sync logic in Phase 2
+    // For now, return a placeholder response
+    return res.status(501).json({
+      error: 'Stripe sync not implemented yet. This will be added in Phase 2.',
+      plan: plan
+    });
+
+  } catch (error) {
+    console.error('Stripe sync error:', error);
+    res.status(500).json({ error: 'Failed to sync with Stripe' });
   }
 });
 

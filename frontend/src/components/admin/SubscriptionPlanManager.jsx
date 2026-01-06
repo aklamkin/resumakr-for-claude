@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Edit2, Sparkles, CheckCircle, ArrowUpDown, Zap, Crown, Rocket, Star, Loader2, DollarSign, Power, ExternalLink } from "lucide-react";
+import { Plus, Trash2, Edit2, Sparkles, CheckCircle, ArrowUpDown, Zap, Crown, Rocket, Star, Loader2, DollarSign, Power, ExternalLink, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const ICON_OPTIONS = {
@@ -208,8 +208,30 @@ const PlanForm = ({ onSubmit, formData, setFormData, editingPlan, handleGenerate
             </div>
           </>
         ) : (
-          <div className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded border border-amber-200 dark:border-amber-800">
-            ⚠️ Not synced with Stripe yet. Users cannot purchase this plan.
+          <div className="space-y-3">
+            <div className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded border border-amber-200 dark:border-amber-800">
+              ⚠️ Not synced with Stripe yet. Users cannot purchase this plan.
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => syncStripeMutation.mutate(editingPlan.id)}
+              disabled={syncStripeMutation.isPending}
+              className="border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950"
+            >
+              {syncStripeMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-1" />
+                  Create in Stripe
+                </>
+              )}
+            </Button>
           </div>
         )}
       </div>
@@ -371,6 +393,32 @@ export default function SubscriptionPlanManager({ showNotification }) {
     },
     onError: (error) => {
       showNotification(`Failed to delete plan: ${error.message}`, "Error", "error");
+    }
+  });
+
+  const syncStripeMutation = useMutation({
+    mutationFn: async (id) => {
+      const response = await fetch(`/api/subscriptions/plans/${id}/sync-stripe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('resumakr_token')}`
+        }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to sync with Stripe');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subscription-plans"] });
+      showNotification("Plan synced with Stripe successfully!", "Success");
+    },
+    onError: (error) => {
+      showNotification(error.message, "Error", "error");
     }
   });
 
