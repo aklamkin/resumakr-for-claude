@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, UserPlus, Search, Pencil, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, UserPlus, Search, Pencil, Trash2, Eye, EyeOff, Mail } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -9,6 +9,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { NotificationPopup } from '../components/ui/notification';
+import { Badge } from '../components/ui/badge';
 import api from '../api/apiClient';
 
 export default function SettingsUsers() {
@@ -26,6 +27,9 @@ export default function SettingsUsers() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [editPassword, setEditPassword] = useState('');
+  const [editPasswordConfirm, setEditPasswordConfirm] = useState('');
   const [newUser, setNewUser] = useState({
     email: '',
     password: '',
@@ -124,8 +128,18 @@ export default function SettingsUsers() {
   const handleUpdateUser = () => {
     const updates = {
       email: selectedUser.email,
-      role: selectedUser.role
+      full_name: selectedUser.full_name,
+      role: selectedUser.role,
+      is_subscribed: selectedUser.is_subscribed,
+      subscription_plan: selectedUser.subscription_plan,
+      subscription_end_date: selectedUser.subscription_end_date,
+      subscription_price: selectedUser.subscription_price
     };
+
+    // Add password if provided and user is email auth
+    if (!selectedUser.oauth_provider && editPassword && editPassword === editPasswordConfirm) {
+      updates.password = editPassword;
+    }
 
     updateUserMutation.mutate({ id: selectedUser.id, updates });
   };
@@ -136,6 +150,9 @@ export default function SettingsUsers() {
 
   const openEditDialog = (user) => {
     setSelectedUser({ ...user });
+    setEditPassword('');
+    setEditPasswordConfirm('');
+    setShowEditPassword(false);
     setIsEditDialogOpen(true);
   };
 
@@ -212,11 +229,9 @@ export default function SettingsUsers() {
                 <thead>
                   <tr className="border-b dark:border-slate-700">
                     <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Email</th>
+                    <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Auth Method</th>
                     <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Role</th>
                     <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Subscription</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Plan</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Price</th>
-                    <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Coupon</th>
                     <th className="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Expires</th>
                     <th className="text-right py-3 px-4 font-medium text-slate-700 dark:text-slate-300">Actions</th>
                   </tr>
@@ -226,28 +241,31 @@ export default function SettingsUsers() {
                     const isSubscribed = user.is_subscribed && user.subscription_end_date && new Date(user.subscription_end_date) > new Date();
                     return (
                     <tr key={user.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                      <td className="py-3 px-4">{user.email}</td>
+                      <td className="py-3 px-4 text-sm">{user.email}</td>
                       <td className="py-3 px-4">
-                        <span className={'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium' + (user.role === 'admin' ? ' bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' : ' bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300')}>
+                        {user.oauth_provider ? (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                            {user.oauth_provider === 'google' ? 'Google' : user.oauth_provider}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700">
+                            <Mail className="w-3 h-3 mr-1" />
+                            Email
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className={user.role === 'admin' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' : ''}>
                           {user.role}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="py-3 px-4">
-                        <span className={'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium' + (isSubscribed ? ' bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : ' bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300')}>
-                          {isSubscribed ? 'Active' : 'None'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-sm">
-                        {user.subscription_plan || '-'}
-                      </td>
-                      <td className="py-3 px-4 text-sm">
-                        {user.subscription_price ? `$${parseFloat(user.subscription_price).toFixed(2)}` : '-'}
-                      </td>
-                      <td className="py-3 px-4 text-sm font-mono">
-                        {user.coupon_code_used || '-'}
+                        <Badge variant={isSubscribed ? 'default' : 'secondary'} className={isSubscribed ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : ''}>
+                          {isSubscribed ? `Active${user.subscription_plan ? ` (${user.subscription_plan})` : ''}` : 'None'}
+                        </Badge>
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">
-                        {user.subscription_end_date ? new Date(user.subscription_end_date).toLocaleDateString() : '-'}
+                        {user.subscription_end_date ? new Date(user.subscription_end_date).toLocaleDateString() : '—'}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex justify-end gap-2">
@@ -328,33 +346,181 @@ export default function SettingsUsers() {
       </Dialog>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
-            <DialogDescription>Update user email and role</DialogDescription>
+            <DialogDescription>Update user information, subscription, and settings</DialogDescription>
           </DialogHeader>
           {selectedUser && (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-email">Email</Label>
-                <Input id="edit-email" type="email" value={selectedUser.email} onChange={(e) => setSelectedUser({ ...selectedUser, email: e.target.value })} />
+            <div className="space-y-6 py-4">
+              {/* Section 1: Basic Information */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 border-b pb-2">Basic Information</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input id="edit-email" type="email" value={selectedUser.email || ''} onChange={(e) => setSelectedUser({ ...selectedUser, email: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-full-name">Full Name</Label>
+                  <Input id="edit-full-name" type="text" value={selectedUser.full_name || ''} onChange={(e) => setSelectedUser({ ...selectedUser, full_name: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-role">Role</Label>
+                  <Select value={selectedUser.role} onValueChange={(value) => setSelectedUser({ ...selectedUser, role: value })}>
+                    <SelectTrigger id="edit-role"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="user">User</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Auth Method</Label>
+                  <div>
+                    {selectedUser.oauth_provider ? (
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                        {selectedUser.oauth_provider === 'google' ? 'Google' : selectedUser.oauth_provider}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        <Mail className="w-3 h-3 mr-1" />
+                        Email/Password
+                      </Badge>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-role">Role</Label>
-                <Select value={selectedUser.role} onValueChange={(value) => setSelectedUser({ ...selectedUser, role: value })}>
-                  <SelectTrigger id="edit-role"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="user">User</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
+
+              {/* Section 2: Password Management (Email users only) */}
+              {!selectedUser.oauth_provider && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 border-b pb-2">Password Management</h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Set a new password for this user (leave blank to keep current password)</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-password">New Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="edit-password"
+                        type={showEditPassword ? 'text' : 'password'}
+                        value={editPassword}
+                        onChange={(e) => setEditPassword(e.target.value)}
+                        placeholder="Enter new password (optional)"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEditPassword(!showEditPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                      >
+                        {showEditPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  {editPassword && (
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-password-confirm">Confirm New Password</Label>
+                      <Input
+                        id="edit-password-confirm"
+                        type={showEditPassword ? 'text' : 'password'}
+                        value={editPasswordConfirm}
+                        onChange={(e) => setEditPasswordConfirm(e.target.value)}
+                        placeholder="Confirm new password"
+                      />
+                      {editPassword !== editPasswordConfirm && editPasswordConfirm && (
+                        <p className="text-xs text-red-600">Passwords do not match</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Section 3: Subscription Management */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 border-b pb-2">Subscription Management</h3>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit-is-subscribed"
+                    checked={selectedUser.is_subscribed || false}
+                    onCheckedChange={(checked) => setSelectedUser({ ...selectedUser, is_subscribed: checked })}
+                  />
+                  <Label htmlFor="edit-is-subscribed" className="font-normal cursor-pointer">Active Subscription</Label>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-subscription-plan">Subscription Plan</Label>
+                  <Select
+                    value={selectedUser.subscription_plan || 'none'}
+                    onValueChange={(value) => setSelectedUser({ ...selectedUser, subscription_plan: value === 'none' ? null : value })}
+                  >
+                    <SelectTrigger id="edit-subscription-plan"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="basic">Basic</SelectItem>
+                      <SelectItem value="pro">Pro</SelectItem>
+                      <SelectItem value="premium">Premium</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-subscription-end">Expiration Date</Label>
+                  <Input
+                    id="edit-subscription-end"
+                    type="date"
+                    value={selectedUser.subscription_end_date ? new Date(selectedUser.subscription_end_date).toISOString().split('T')[0] : ''}
+                    onChange={(e) => setSelectedUser({ ...selectedUser, subscription_end_date: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-subscription-price">Price (optional)</Label>
+                  <Input
+                    id="edit-subscription-price"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={selectedUser.subscription_price || ''}
+                    onChange={(e) => setSelectedUser({ ...selectedUser, subscription_price: e.target.value })}
+                  />
+                </div>
+                {selectedUser.coupon_code_used && (
+                  <div className="space-y-2">
+                    <Label>Coupon Code Used</Label>
+                    <div className="text-sm font-mono bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded border">
+                      {selectedUser.coupon_code_used}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="text-sm text-slate-500 dark:text-slate-400">Auth Method: <span className="font-medium">{selectedUser.auth_method}</span></div>
+
+              {/* Section 4: Account Details (Read-only) */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 border-b pb-2">Account Details</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <Label className="text-xs text-slate-600 dark:text-slate-400">Created At</Label>
+                    <p className="mt-1">{selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleString() : '—'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-slate-600 dark:text-slate-400">Last Login</Label>
+                    <p className="mt-1">{selectedUser.last_login ? new Date(selectedUser.last_login).toLocaleString() : '—'}</p>
+                  </div>
+                  {selectedUser.subscription_started_at && (
+                    <div>
+                      <Label className="text-xs text-slate-600 dark:text-slate-400">Subscription Started</Label>
+                      <p className="mt-1">{new Date(selectedUser.subscription_started_at).toLocaleString()}</p>
+                    </div>
+                  )}
+                  <div>
+                    <Label className="text-xs text-slate-600 dark:text-slate-400">User ID</Label>
+                    <p className="mt-1 font-mono text-xs">{selectedUser.id}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleUpdateUser} disabled={updateUserMutation.isPending}>
+            <Button
+              onClick={handleUpdateUser}
+              disabled={updateUserMutation.isPending || (editPassword && editPassword !== editPasswordConfirm)}
+            >
               {updateUserMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Update User
             </Button>
@@ -382,8 +548,7 @@ export default function SettingsUsers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
+
       <NotificationPopup
         open={notification.open}
         onClose={() => setNotification({ ...notification, open: false })}
@@ -391,4 +556,6 @@ export default function SettingsUsers() {
         message={notification.message}
         type={notification.type}
       />
+    </div>
+  );
 }

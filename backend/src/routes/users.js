@@ -8,9 +8,16 @@ const router = express.Router();
 // Get all users with optional search/filter
 router.get('/', authenticate, requireAdmin, async (req, res) => {
   try {
-    const { search, role, sort = 'created_at', order = 'desc' } = req.query;
+    const { search, role, auth_method, sort = 'created_at', order = 'desc' } = req.query;
 
-    let sql = 'SELECT id, email, full_name, role, is_subscribed, subscription_plan, created_at, updated_at FROM users WHERE 1=1';
+    let sql = `SELECT
+      id, email, full_name, role,
+      is_subscribed, subscription_plan, subscription_end_date, subscription_price, subscription_started_at,
+      coupon_code_used, campaign_id,
+      oauth_provider, oauth_id, avatar_url,
+      last_login, created_at, updated_at,
+      CASE WHEN oauth_provider IS NULL THEN 'email' ELSE oauth_provider END as auth_method
+    FROM users WHERE 1=1`;
     const params = [];
 
     // Search by email
@@ -23,6 +30,16 @@ router.get('/', authenticate, requireAdmin, async (req, res) => {
     if (role) {
       params.push(role);
       sql += ` AND role = $${params.length}`;
+    }
+
+    // Filter by auth method
+    if (auth_method && auth_method !== 'all') {
+      if (auth_method === 'email') {
+        sql += ` AND oauth_provider IS NULL`;
+      } else {
+        params.push(auth_method);
+        sql += ` AND oauth_provider = $${params.length}`;
+      }
     }
 
     // Sorting
@@ -45,7 +62,14 @@ router.get('/', authenticate, requireAdmin, async (req, res) => {
 router.get('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
     const result = await query(
-      'SELECT id, email, full_name, role, is_subscribed, subscription_plan, created_at, updated_at FROM users WHERE id = $1',
+      `SELECT
+        id, email, full_name, role,
+        is_subscribed, subscription_plan, subscription_end_date, subscription_price, subscription_started_at,
+        coupon_code_used, campaign_id,
+        oauth_provider, oauth_id, avatar_url,
+        last_login, created_at, updated_at,
+        CASE WHEN oauth_provider IS NULL THEN 'email' ELSE oauth_provider END as auth_method
+      FROM users WHERE id = $1`,
       [req.params.id]
     );
 
@@ -96,7 +120,7 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
 // Update user
 router.put('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
-    const { email, password, full_name, role } = req.body;
+    const { email, password, full_name, role, is_subscribed, subscription_plan, subscription_end_date, subscription_price } = req.body;
     const userId = req.params.id;
 
     // Prevent admin from demoting themselves
@@ -129,6 +153,26 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
       updates.push(`role = $${params.length}`);
     }
 
+    if (is_subscribed !== undefined) {
+      params.push(is_subscribed);
+      updates.push(`is_subscribed = $${params.length}`);
+    }
+
+    if (subscription_plan !== undefined) {
+      params.push(subscription_plan);
+      updates.push(`subscription_plan = $${params.length}`);
+    }
+
+    if (subscription_end_date !== undefined) {
+      params.push(subscription_end_date);
+      updates.push(`subscription_end_date = $${params.length}`);
+    }
+
+    if (subscription_price !== undefined) {
+      params.push(subscription_price);
+      updates.push(`subscription_price = $${params.length}`);
+    }
+
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
@@ -136,7 +180,12 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
     params.push(userId);
     updates.push('updated_at = NOW()');
 
-    const sql = `UPDATE users SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING id, email, full_name, role, created_at, updated_at`;
+    const sql = `UPDATE users SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING
+      id, email, full_name, role,
+      is_subscribed, subscription_plan, subscription_end_date, subscription_price, subscription_started_at,
+      coupon_code_used, campaign_id,
+      oauth_provider, oauth_id, avatar_url,
+      last_login, created_at, updated_at`;
 
     const result = await query(sql, params);
 
