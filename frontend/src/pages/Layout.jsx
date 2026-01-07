@@ -306,6 +306,20 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
           )}
         </SidebarContent>
 
+        {/* Footer - User Email */}
+        {user && (
+          <SidebarFooter className="border-t border-border/50 bg-muted/30 px-4 py-3 mt-auto">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex-shrink-0">
+                <User className="h-4 w-4 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium truncate">{user.full_name || 'User'}</p>
+                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              </div>
+            </div>
+          </SidebarFooter>
+        )}
       </Sidebar>
 
       <main className="flex-1 overflow-auto bg-background">

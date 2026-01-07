@@ -28,7 +28,7 @@ const COLOR_PRESETS = [
   { label: "Amber", from: "amber-600", to: "amber-700" }
 ];
 
-const PlanForm = ({ onSubmit, formData, setFormData, editingPlan, handleGenerateFeatures, addFeature, updateFeature, removeFeature }) => (
+const PlanForm = ({ onSubmit, formData, setFormData, editingPlan, handleGenerateFeatures, addFeature, updateFeature, removeFeature, syncStripeMutation }) => (
   <form onSubmit={onSubmit} className="space-y-6">
     <div className="grid md:grid-cols-2 gap-4">
       <div>
@@ -397,28 +397,13 @@ export default function SubscriptionPlanManager({ showNotification }) {
   });
 
   const syncStripeMutation = useMutation({
-    mutationFn: async (id) => {
-      const response = await fetch(`/api/subscriptions/plans/${id}/sync-stripe`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('resumakr_token')}`
-        }
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to sync with Stripe');
-      }
-
-      return response.json();
-    },
+    mutationFn: (id) => api.entities.SubscriptionPlan.syncStripe(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subscription-plans"] });
       showNotification("Plan synced with Stripe successfully!", "Success");
     },
     onError: (error) => {
-      showNotification(error.message, "Error", "error");
+      showNotification(error.message || "Failed to sync with Stripe", "Error", "error");
     }
   });
 
@@ -726,7 +711,7 @@ Create content that flows beautifully across headlines, features, CTAs, and disc
           >
             <Card className="p-6 border-2 border-indigo-200 dark:border-indigo-700 bg-white dark:bg-slate-800">
               <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-6">Create New Plan</h3>
-              <PlanForm 
+              <PlanForm
                 onSubmit={handleSubmit}
                 formData={formData}
                 setFormData={setFormData}
@@ -735,6 +720,7 @@ Create content that flows beautifully across headlines, features, CTAs, and disc
                 addFeature={addFeature}
                 updateFeature={updateFeature}
                 removeFeature={removeFeature}
+                syncStripeMutation={syncStripeMutation}
               />
             </Card>
           </motion.div>
@@ -889,7 +875,7 @@ Create content that flows beautifully across headlines, features, CTAs, and disc
                         <tr>
                           <td colSpan={7} className="p-6 bg-indigo-50 dark:bg-indigo-950/30">
                             <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Edit Plan</h3>
-                            <PlanForm 
+                            <PlanForm
                               onSubmit={handleSubmit}
                               formData={formData}
                               setFormData={setFormData}
@@ -898,6 +884,7 @@ Create content that flows beautifully across headlines, features, CTAs, and disc
                               addFeature={addFeature}
                               updateFeature={updateFeature}
                               removeFeature={removeFeature}
+                              syncStripeMutation={syncStripeMutation}
                             />
                           </td>
                         </tr>

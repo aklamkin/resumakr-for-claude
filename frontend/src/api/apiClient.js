@@ -137,6 +137,10 @@ export const api = {
       },
       async delete(id) {
         await client.delete(`/subscriptions/plans/${id}`);
+      },
+      async syncStripe(id) {
+        const { data } = await client.post(`/subscriptions/plans/${id}/sync-stripe`);
+        return data;
       }
     },
     AIProvider: {
@@ -321,6 +325,10 @@ export const api = {
     },
     async applyCoupon(coupon_code) {
       const { data } = await client.post('/coupons/apply', { coupon_code });
+      return data;
+    },
+    async invoke(functionName, params) {
+      const { data } = await client.post(`/ai/${functionName}`, params);
       return data;
     }
   }

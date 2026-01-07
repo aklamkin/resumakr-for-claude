@@ -5,6 +5,23 @@
     <link rel="icon" type="image/svg+xml" href="https://base44.com/logo_v2.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Resumakr</title>
+    <script>
+      // Apply theme immediately to prevent flash of wrong theme
+      (function() {
+        const savedTheme = localStorage.getItem('theme');
+        const root = document.documentElement;
+
+        if (savedTheme === 'light') {
+          root.classList.add('light');
+        } else if (savedTheme === 'dark') {
+          root.classList.add('dark');
+        } else if (savedTheme === 'system' || !savedTheme) {
+          // Apply system preference
+          const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          root.classList.add(isDark ? 'dark' : 'light');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

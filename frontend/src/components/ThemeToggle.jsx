@@ -1,47 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Sun, Moon, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTheme } from "@/hooks/useTheme";
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState(() => {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) return savedTheme;
-    
-    // Default to system preference, fallback to dark if not detected
-    const systemPreference = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 
-                            window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 
-                            'dark';
-    return systemPreference;
-  });
-
-  useEffect(() => {
-    const root = window.document.documentElement;
-    
-    const applyTheme = (themeMode) => {
-      root.classList.remove('light', 'dark');
-      
-      if (themeMode === 'system') {
-        const systemPreference = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        root.classList.add(systemPreference);
-      } else {
-        root.classList.add(themeMode);
-      }
-    };
-
-    applyTheme(theme);
-    localStorage.setItem('theme', theme);
-
-    // Listen for system theme changes when in system mode
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleSystemThemeChange = () => {
-      if (theme === 'system') {
-        applyTheme('system');
-      }
-    };
-
-    mediaQuery.addEventListener('change', handleSystemThemeChange);
-    return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
-  }, [theme]);
+  const [theme, setTheme] = useTheme();
 
   const cycleTheme = () => {
     const themes = ['light', 'dark', 'system'];
