@@ -140,6 +140,13 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
           --sidebar-width-icon: 60px;
         }
 
+        /* Ensure sidebar has full height flex layout */
+        [data-sidebar="sidebar"] {
+          display: flex !important;
+          flex-direction: column !important;
+          height: 100% !important;
+        }
+
         /* Custom scrollbar for sidebar */
         .sidebar-scroll::-webkit-scrollbar {
           width: 6px;
@@ -202,9 +209,9 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
         }
       `}</style>
 
-      <Sidebar collapsible="none" className="border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <Sidebar collapsible="none" className="border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex flex-col">
         {/* Header */}
-        <SidebarHeader className="border-b border-border/50 bg-muted/30 px-4 py-4">
+        <SidebarHeader className="border-b border-border/50 bg-muted/30 px-4 py-4 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 shadow-md flex-shrink-0">
               <FileCheck className="h-5 w-5 text-white" />
@@ -217,7 +224,7 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
         </SidebarHeader>
 
         {/* Navigation */}
-        <SidebarContent className="sidebar-scroll px-3 py-4">
+        <SidebarContent className="sidebar-scroll px-3 py-4 flex-1 overflow-y-auto">
           {/* Main Navigation */}
           <SidebarGroup className="px-0">
             <SidebarGroupContent>
@@ -308,7 +315,7 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
 
         {/* Footer - User Email */}
         {user && (
-          <SidebarFooter className="border-t border-border/50 bg-muted/30 px-4 py-3 mt-auto">
+          <SidebarFooter className="border-t border-border/50 bg-muted/30 px-4 py-3 flex-shrink-0">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex-shrink-0">
                 <User className="h-4 w-4 text-white" />
