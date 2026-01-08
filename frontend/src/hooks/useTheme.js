@@ -6,10 +6,11 @@ import { useEffect, useState } from 'react';
  */
 export function useThemeInitializer() {
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
     const root = window.document.documentElement;
+    let currentTheme = localStorage.getItem('theme');
 
     const applyTheme = (themeMode) => {
+      currentTheme = themeMode;
       root.classList.remove('light', 'dark');
 
       if (themeMode === 'system' || !themeMode) {
@@ -21,7 +22,17 @@ export function useThemeInitializer() {
     };
 
     // Apply theme immediately
-    applyTheme(savedTheme);
+    applyTheme(currentTheme);
+
+    // Listen for system preference changes
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemThemeChange = () => {
+      // Only re-apply if we're in system mode
+      if (currentTheme === 'system' || !currentTheme) {
+        applyTheme(currentTheme);
+      }
+    };
+    mediaQuery.addEventListener('change', handleSystemThemeChange);
 
     // Listen for theme changes in localStorage (from other tabs or components)
     const handleStorageChange = (e) => {
@@ -29,7 +40,6 @@ export function useThemeInitializer() {
         applyTheme(e.newValue);
       }
     };
-
     window.addEventListener('storage', handleStorageChange);
 
     // Listen for custom theme change events from ThemeToggle
@@ -39,6 +49,7 @@ export function useThemeInitializer() {
     window.addEventListener('themechange', handleThemeChange);
 
     return () => {
+      mediaQuery.removeEventListener('change', handleSystemThemeChange);
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('themechange', handleThemeChange);
     };
