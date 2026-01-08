@@ -133,7 +133,7 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
     : navigationItems.filter(item => !item.requiresAuth);
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className="h-screen flex">
       <style>{`
         :root {
           --sidebar-width: 280px;
