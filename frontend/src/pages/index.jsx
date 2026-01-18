@@ -4,6 +4,8 @@ import Home from "./Home";
 import Login from "./Login";
 import Signup from "./Signup";
 import AuthCallback from "./AuthCallback";
+import ForgotPassword from "./ForgotPassword";
+import ResetPassword from "./ResetPassword";
 import UploadResume from "./UploadResume";
 import BuildWizard from "./BuildWizard";
 import ResumeReview from "./ResumeReview";
@@ -68,12 +70,14 @@ function PagesContent() {
     const isPublicPage = PUBLIC_PAGES.includes(currentPage) || location.pathname === '/login' || location.pathname === '/signup';
     
     // Auth pages don't use Layout
-    if (location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/auth/callback') {
+    if (location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/auth/callback' || location.pathname === '/forgot-password' || location.pathname === '/reset-password') {
         return (
             <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
             </Routes>
         );
     }

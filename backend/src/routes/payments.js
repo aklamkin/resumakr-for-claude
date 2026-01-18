@@ -1,22 +1,28 @@
 import express from 'express';
+import { z } from 'zod';
 import { authenticate } from '../middleware/auth.js';
 import stripeService from '../services/stripe.js';
 import { query } from '../config/database.js';
+import { validate } from '../middleware/validate.js';
 
 const router = express.Router();
 router.use(authenticate);
+
+// Checkout session schema
+const checkoutSessionSchema = z.object({
+  plan_id: z.string().min(1, 'Plan ID is required'),
+  coupon_code: z.string().max(50).optional().nullable(),
+  success_url: z.string().url().optional(),
+  cancel_url: z.string().url().optional()
+});
 
 /**
  * POST /api/payments/create-checkout-session
  * Create a Stripe Checkout session for subscription payment
  */
-router.post('/create-checkout-session', async (req, res) => {
+router.post('/create-checkout-session', validate(checkoutSessionSchema), async (req, res) => {
   try {
     const { plan_id, coupon_code, success_url, cancel_url } = req.body;
-
-    if (!plan_id) {
-      return res.status(400).json({ error: 'plan_id is required' });
-    }
 
     // Get plan details
     const planResult = await query('SELECT * FROM subscription_plans WHERE plan_id = $1 AND is_active = true', [plan_id]);

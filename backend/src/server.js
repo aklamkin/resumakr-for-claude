@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import session from 'express-session';
@@ -29,6 +28,8 @@ import webhookRoutes from './routes/webhooks.js';
 
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFound } from './middleware/notFound.js';
+import { requestIdMiddleware, httpLogger } from './middleware/requestId.js';
+import logger, { log } from './utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,14 +38,12 @@ dotenv.config();
 
 // Global error handlers - MUST be at the top
 process.on('uncaughtException', (error) => {
-  console.error('💥 UNCAUGHT EXCEPTION:', error);
-  console.error('Stack:', error.stack);
+  log.error('Uncaught exception', { error: error.message, stack: error.stack });
   // Don't exit, just log it
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('💥 UNHANDLED REJECTION at:', promise);
-  console.error('Reason:', reason);
+  log.error('Unhandled rejection', { reason: String(reason), promise: String(promise) });
 });
 
 const app = express();
@@ -87,11 +86,9 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-if (process.env.NODE_ENV !== 'production') {
-  app.use(morgan('dev'));
-} else {
-  app.use(morgan('combined'));
-}
+// Request ID and HTTP logging middleware (replaces morgan)
+app.use(requestIdMiddleware);
+app.use(httpLogger);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
@@ -120,10 +117,9 @@ app.use(notFound);
 app.use(errorHandler);
 
 app.listen(PORT, () => {
-  console.log(`🚀 Resumakr API server running on port ${PORT}`);
-  console.log(`📝 Environment: ${process.env.NODE_ENV}`);
+  log.info('Server started', { port: PORT, environment: process.env.NODE_ENV });
 });
 
 process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
+  log.info('SIGTERM signal received: closing HTTP server');
 });

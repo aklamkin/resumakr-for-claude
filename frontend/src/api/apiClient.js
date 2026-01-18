@@ -55,6 +55,18 @@ export const api = {
     logout() {
       localStorage.removeItem('resumakr_token');
       window.location.href = '/login';
+    },
+    async forgotPassword(email) {
+      const { data } = await client.post('/auth/forgot-password', { email });
+      return data;
+    },
+    async verifyResetToken(token) {
+      const { data } = await client.get(`/auth/verify-reset-token/${token}`);
+      return data;
+    },
+    async resetPassword(token, new_password) {
+      const { data } = await client.post('/auth/reset-password', { token, new_password });
+      return data;
     }
   },
   entities: {

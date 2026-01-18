@@ -1,6 +1,9 @@
 import express from 'express';
+import { z } from 'zod';
 import { query } from '../config/database.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { idParamSchema, validateCouponSchema } from '../validators/schemas.js';
 
 const router = express.Router();
 
@@ -8,6 +11,22 @@ const router = express.Router();
 const isUniqueViolation = (error) => {
   return error.code === '23505';
 };
+
+// Coupon creation schema
+const createCouponSchema = z.object({
+  code: z.string().min(1, 'Code is required').max(50).transform(val => val.toUpperCase()),
+  discount_type: z.enum(['percentage', 'fixed'], { required_error: 'Discount type is required' }),
+  discount_value: z.number().positive('Discount value must be positive'),
+  applicable_plans: z.array(z.number().int().positive()).optional().default([]),
+  max_uses: z.number().int().positive().optional().nullable(),
+  valid_until: z.string().datetime().optional().nullable(),
+  valid_from: z.string().datetime().optional().nullable(),
+  description: z.string().max(500).optional().nullable(),
+  is_active: z.boolean().optional().default(true)
+});
+
+// Coupon update schema
+const updateCouponSchema = createCouponSchema.partial();
 
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -19,13 +38,9 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-router.post('/', authenticate, requireAdmin, async (req, res) => {
+router.post('/', authenticate, requireAdmin, validate(createCouponSchema), async (req, res) => {
   try {
     const { code, discount_type, discount_value, applicable_plans, max_uses, valid_until, description, is_active } = req.body;
-
-    if (!code || !discount_type || discount_value === undefined) {
-      return res.status(400).json({ error: 'code, discount_type, and discount_value are required' });
-    }
 
     const result = await query(
       `INSERT INTO coupon_codes (code, discount_type, discount_value, applicable_plans, max_uses, valid_until, description, is_active)
@@ -35,11 +50,11 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
         code,
         discount_type,
         discount_value,
-        JSON.stringify(applicable_plans || []),
+        JSON.stringify(applicable_plans),
         max_uses || null,
         valid_until || null,
         description || null,
-        is_active !== false
+        is_active
       ]
     );
 
@@ -53,7 +68,7 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-router.put('/:id', authenticate, requireAdmin, async (req, res) => {
+router.put('/:id', authenticate, requireAdmin, validate(idParamSchema, 'params'), validate(updateCouponSchema), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -94,7 +109,7 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+router.delete('/:id', authenticate, requireAdmin, validate(idParamSchema, 'params'), async (req, res) => {
   try {
     const { id } = req.params;
     const result = await query('DELETE FROM coupon_codes WHERE id = $1 RETURNING *', [id]);
@@ -111,13 +126,9 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
 });
 
 // Validate coupon code
-router.post('/validate', async (req, res) => {
+router.post('/validate', validate(validateCouponSchema), async (req, res) => {
   try {
     const { coupon_code, plan_id } = req.body;
-
-    if (!coupon_code) {
-      return res.status(400).json({ valid: false, error: 'Coupon code is required' });
-    }
 
     // Find the coupon
     const result = await query(
