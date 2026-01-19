@@ -96,7 +96,7 @@ export default function SubscriptionSuccess() {
             transition={{ delay: 0.3 }}
             className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-3"
           >
-            Welcome to Resumakr Premium!
+            Welcome to Resumakr!
           </motion.h1>
 
           <motion.p
@@ -105,7 +105,7 @@ export default function SubscriptionSuccess() {
             transition={{ delay: 0.4 }}
             className="text-slate-600 dark:text-slate-400 mb-6"
           >
-            Your payment was successful and your subscription is now active. You have full access to all premium features!
+            Your payment was successful and your subscription is now active. You have full access to all features!
           </motion.p>
 
           <motion.div
@@ -116,7 +116,7 @@ export default function SubscriptionSuccess() {
           >
             <div className="flex items-center gap-2 justify-center mb-3">
               <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              <span className="font-semibold text-slate-900 dark:text-slate-100">Premium Features Unlocked</span>
+              <span className="font-semibold text-slate-900 dark:text-slate-100">Features Unlocked</span>
             </div>
             <ul className="text-sm text-slate-700 dark:text-slate-300 space-y-1">
               <li>✓ Unlimited resume creation</li>

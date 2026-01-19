@@ -310,7 +310,7 @@ export default function SubscriptionManagement() {
           >
             <Card className="p-8 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
               <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">
-                {isActive ? "Your Plan Includes" : "Premium Features"}
+                {isActive ? "Your Plan Includes" : "Plan Features"}
               </h3>
               <div className="grid md:grid-cols-2 gap-4">
                 {[
