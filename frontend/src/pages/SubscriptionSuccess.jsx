@@ -22,7 +22,8 @@ export default function SubscriptionSuccess() {
       try {
         // Invalidate user query to fetch updated subscription status
         await queryClient.invalidateQueries(["current-user"]);
-        setVerifying(false);
+        // Redirect directly to My Resumes page
+        navigate("/my-resumes");
       } catch (err) {
         console.error("Error refreshing user data:", err);
         setError("Failed to verify subscription. Please refresh the page.");
@@ -31,7 +32,7 @@ export default function SubscriptionSuccess() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [queryClient]);
+  }, [queryClient, navigate]);
 
   if (verifying) {
     return (
