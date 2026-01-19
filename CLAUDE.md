@@ -19,7 +19,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **🔑 Quick context:**
 - All resume operations now require active subscription
-- Marketing campaigns can provide free trial periods
+- Coupon codes provide discounts (configured in admin, synced to Stripe at checkout)
+- Free trials are configured directly in Stripe
 - Stripe Checkout handles all payment processing
 - Webhooks at `/api/webhooks/stripe` process subscription events
 
@@ -115,11 +116,11 @@ Both `backend/.env` and root `.env` need to be configured for local development.
 - `/ai` - AI integration endpoints (requires subscription)
 - `/upload` - File upload and parsing
 - `/subscriptions` - Subscription plan management
+- `/payments` - Stripe checkout session creation
 - `/providers` - AI provider configuration (admin only)
 - `/prompts` - Custom AI prompts (admin only)
 - `/faq` - FAQ management
 - `/coupons` - Coupon code management
-- `/campaigns` - Marketing campaigns
 - `/settings` - App settings (admin only)
 - `/users` - User management (admin only)
 
@@ -187,7 +188,7 @@ Both `backend/.env` and root `.env` need to be configured for local development.
 
 **custom_prompts**: Admin-configurable AI prompts
 
-**coupon_codes**, **marketing_campaigns**: Monetization features
+**coupon_codes**: Discount code management
 
 **faq_items**, **help_config**: Help system
 

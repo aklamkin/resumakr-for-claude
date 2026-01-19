@@ -17,8 +17,6 @@ export const FAQItem = api.entities.FAQItem;
 
 export const HelpConfig = api.entities.HelpConfig;
 
-export const MarketingCampaign = api.entities.MarketingCampaign;
-
 export const CouponCode = api.entities.CouponCode;
 
 export const SubscriptionPlan = api.entities.SubscriptionPlan;

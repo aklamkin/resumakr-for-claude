@@ -4,7 +4,7 @@ import { createPageUrl } from "@/utils";
 import {
   FileCheck, Home, Settings as SettingsIcon, User,
   HelpCircle, DollarSign, Brain, FileText, Ticket, Tag,
-  TrendingUp, ChevronDown, ChevronRight, Monitor, Users
+  ChevronDown, ChevronRight, Monitor, Users
 } from "lucide-react";
 import {
   Sidebar,
@@ -81,11 +81,6 @@ const settingsItems = [
     title: "Coupon Codes",
     url: createPageUrl("SettingsCodes"),
     icon: Ticket,
-  },
-  {
-    title: "Campaigns",
-    url: createPageUrl("SettingsCampaigns"),
-    icon: TrendingUp,
   },
   {
     title: "Help & FAQs",

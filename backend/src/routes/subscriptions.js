@@ -220,16 +220,8 @@ router.post('/plans/:id/sync-stripe', authenticate, requireAdmin, async (req, re
 // Activate subscription for current user
 router.post('/activate', authenticate, async (req, res) => {
   try {
-    const { plan_id, coupon_code, campaign_id, final_price } = req.body;
+    const { plan_id, coupon_code, final_price } = req.body;
     const userId = req.user.id;
-
-    console.log('[SUBSCRIPTION ACTIVATE] Starting activation');
-    console.log('[SUBSCRIPTION ACTIVATE] User ID:', userId);
-    console.log('[SUBSCRIPTION ACTIVATE] Plan ID:', plan_id);
-    console.log('[SUBSCRIPTION ACTIVATE] Coupon code:', coupon_code);
-    console.log('[SUBSCRIPTION ACTIVATE] Campaign ID:', campaign_id);
-    console.log('[SUBSCRIPTION ACTIVATE] Final price:', final_price);
-    console.log('[SUBSCRIPTION ACTIVATE] Current user state:', { is_subscribed: req.user.is_subscribed, subscription_plan: req.user.subscription_plan });
 
     if (!plan_id) {
       return res.status(400).json({ error: 'Plan ID is required' });
@@ -246,7 +238,6 @@ router.post('/activate', authenticate, async (req, res) => {
     }
 
     const plan = planResult.rows[0];
-    console.log('[SUBSCRIPTION ACTIVATE] Found plan:', { name: plan.name, period: plan.period, duration: plan.duration });
 
     // Calculate subscription end date based on plan duration
     const endDate = new Date();
@@ -260,13 +251,6 @@ router.post('/activate', authenticate, async (req, res) => {
       endDate.setFullYear(endDate.getFullYear() + plan.duration);
     }
 
-    console.log('[SUBSCRIPTION ACTIVATE] Calculated end date:', endDate);
-    console.log('[SUBSCRIPTION ACTIVATE] About to execute UPDATE query with params:', {
-      plan_id,
-      endDate: endDate.toISOString(),
-      userId
-    });
-
     // Update user subscription
     const updateResult = await query(
       `UPDATE users
@@ -274,24 +258,18 @@ router.post('/activate', authenticate, async (req, res) => {
            subscription_plan = $1,
            subscription_end_date = $2,
            coupon_code_used = $3,
-           campaign_id = $4,
-           subscription_price = $5,
+           subscription_price = $4,
            subscription_started_at = NOW(),
            updated_at = NOW()
-       WHERE id = $6
-       RETURNING id, email, full_name, is_subscribed, subscription_plan, subscription_end_date, coupon_code_used, campaign_id, subscription_price, subscription_started_at`,
-      [plan_id, endDate, coupon_code || null, campaign_id || null, final_price || plan.price, userId]
+       WHERE id = $5
+       RETURNING id, email, full_name, is_subscribed, subscription_plan, subscription_end_date, coupon_code_used, subscription_price, subscription_started_at`,
+      [plan_id, endDate, coupon_code || null, final_price || plan.price, userId]
     );
-
-    console.log('[SUBSCRIPTION ACTIVATE] UPDATE query completed');
-    console.log('[SUBSCRIPTION ACTIVATE] Rows affected:', updateResult.rows.length);
-    console.log('[SUBSCRIPTION ACTIVATE] Returned data:', updateResult.rows[0]);
 
     if (updateResult.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    console.log('[SUBSCRIPTION ACTIVATE] Returning response to client');
     res.json({
       message: 'Subscription activated successfully',
       user: updateResult.rows[0],

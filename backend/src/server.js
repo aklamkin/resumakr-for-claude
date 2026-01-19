@@ -20,7 +20,6 @@ import providerRoutes from './routes/providers.js';
 import promptRoutes from './routes/prompts.js';
 import faqRoutes from './routes/faq.js';
 import couponRoutes from './routes/coupons.js';
-import campaignRoutes from './routes/campaigns.js';
 import settingsRoutes from './routes/settings.js';
 import usersRoutes from './routes/users.js';
 import paymentRoutes from './routes/payments.js';
@@ -107,7 +106,6 @@ app.use('/api/prompts', promptRoutes);
 app.use('/api/providers', providerRoutes);
 app.use('/api/faq', faqRoutes);
 app.use('/api/coupons', couponRoutes);
-app.use('/api/campaigns', campaignRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/users', usersRoutes);
 

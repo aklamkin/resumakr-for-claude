@@ -329,13 +329,6 @@ export default function SubscriptionPlanManager({ showNotification }) {
     refetchOnMount: false,
   });
 
-  const { data: campaigns = [] } = useQuery({
-    queryKey: ["marketing-campaigns"],
-    queryFn: () => api.entities.MarketingCampaign.list("-created_date"),
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-  });
-
   const sortedPlans = useMemo(() => {
     return [...plans].sort((a, b) => {
       let aVal = a[sortField];
@@ -474,7 +467,6 @@ export default function SubscriptionPlanManager({ showNotification }) {
     setGeneratingPricingPage(true);
     try {
       const activePlans = plans.filter(p => p.is_active);
-      const activeCampaign = campaigns.find(c => c.is_active);
 
       const prompt = `You are an elite copywriter crafting pricing content for Resumakr—an AI-powered resume builder transforming how professionals land their dream jobs.
 
@@ -488,23 +480,6 @@ ${activePlans.map(p => `
 ├─ STATUS: ${p.is_popular ? '⭐ POPULAR CHOICE' : p.badge_text ? `🏷️ ${p.badge_text}` : 'Standard'}
 └─ Current Features: ${p.features?.length > 0 ? p.features.join(' • ') : '⚠️ Not configured yet'}
 `).join('\n')}
-
-${activeCampaign ? `
-════════════════════════════════════════════
-🎯 ACTIVE MARKETING CAMPAIGN:
-════════════════════════════════════════════
-Campaign: ${activeCampaign.campaign_name}
-Target: ${activeCampaign.target_plan.toUpperCase()} Plan
-Type: ${activeCampaign.campaign_type.toUpperCase()}
-${activeCampaign.free_trial_duration ? `🎁 SPECIAL OFFER: +${activeCampaign.free_trial_duration} BONUS DAYS (total ${plans.find(p => p.plan_id === activeCampaign.target_plan)?.duration + activeCampaign.free_trial_duration} days!)` : ''}
-${activeCampaign.discount_percentage ? `💰 DISCOUNT: ${activeCampaign.discount_percentage}% OFF the regular price` : ''}
-${activeCampaign.discount_amount ? `💰 DISCOUNT: Save $${activeCampaign.discount_amount}` : ''}
-${activeCampaign.start_date && activeCampaign.end_date ? `⏰ LIMITED TIME: ${activeCampaign.start_date} → ${activeCampaign.end_date}` : ''}
-` : `
-════════════════════════════════════════════
-ℹ️ No active campaign running currently
-════════════════════════════════════════════
-`}
 
 ════════════════════════════════════════════
 🎯 YOUR MISSION AS WORLD-CLASS COPYWRITER:
@@ -523,22 +498,18 @@ Channel: The excitement of unlocking potential + the trust of transparency
 ✓ Transform features into BENEFITS and OUTCOMES
    ❌ "Unlimited resumes"
    ✅ "Build unlimited resumes until you land your dream role"
-   
+
 ✓ Use power words that inspire action
    - Transform, Elevate, Unlock, Accelerate, Standout, Craft, Perfect, Professional
-   
+
 ✓ Paint the picture of SUCCESS
    - Focus on career transformations, not just software features
    - "Get the interview" not "pass ATS scans"
-   
+
 ✓ Be MEMORABLE yet PROFESSIONAL
    - Creative but never gimmicky
    - Confident but never arrogant
    - Exciting but never misleading
-
-✓ Integrate campaign offers NATURALLY
-   - Don't just append "bonus days"—weave it into the value story
-   - Make limited-time offers create genuine urgency without pressure
 
 ⚠️ **NON-NEGOTIABLE RULES:**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -546,7 +517,6 @@ Channel: The excitement of unlocking potential + the trust of transparency
 🚫 NEVER misrepresent prices, discounts, or durations
 🚫 NEVER promise instant results—be realistic
 ✅ ALWAYS be accurate with every number
-✅ ALWAYS reflect campaign bonuses correctly
 ✅ ALWAYS maintain professional credibility
 
 📝 **TONE GUIDANCE:**
@@ -565,7 +535,6 @@ Create content that flows beautifully across headlines, features, CTAs, and disc
         properties: {
           page_headline: { type: "string" },
           page_subheadline: { type: "string" },
-          campaign_banner_text: { type: "string" },
           unified_features_list: { type: "array", items: { type: "string" } },
           disclaimer_text: { type: "string" },
           plans_content: {
@@ -592,28 +561,18 @@ Create content that flows beautifully across headlines, features, CTAs, and disc
           await api.entities.SubscriptionPlan.update(plan.id, {
             ai_generated_content: {
               headline: planContent.enhanced_headline,
-              cta_text: planContent.cta_text
+              cta_text: planContent.cta_text,
+              page_headline: result.page_headline,
+              page_subheadline: result.page_subheadline,
+              disclaimer_text: result.disclaimer_text
             },
             features: result.unified_features_list
           });
         }
       }
 
-      if (activeCampaign) {
-        await api.entities.MarketingCampaign.update(activeCampaign.id, {
-          ai_generated_pricing_content_json: {
-            campaign_banner_text: result.campaign_banner_text || result.page_headline,
-            page_headline: result.page_headline,
-            page_subheadline: result.page_subheadline,
-            feature_highlights: result.unified_features_list,
-            disclaimer_text: result.disclaimer_text
-          }
-        });
-      }
-
       queryClient.invalidateQueries({ queryKey: ["subscription-plans"] });
-      queryClient.invalidateQueries({ queryKey: ["marketing-campaigns"] });
-      
+
       showNotification("Pricing page content generated successfully!", "Success");
     } catch (error) {
       showNotification(`Failed to generate pricing page: ${error.message}`, "Error", "error");
@@ -768,7 +727,6 @@ Create content that flows beautifully across headlines, features, CTAs, and disc
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                 {sortedPlans.map((plan) => {
                   const IconComponent = ICON_OPTIONS[plan.icon_name] || Sparkles;
-                  const hasCampaign = campaigns.find(c => c.is_active && c.target_plan === plan.plan_id);
                   const isEditing = editingPlan?.id === plan.id;
                   
                   return (
@@ -829,7 +787,6 @@ Create content that flows beautifully across headlines, features, CTAs, and disc
                               )}
                               {plan.is_popular && <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">Popular</Badge>}
                               {plan.badge_text && <Badge variant="secondary">{plan.badge_text}</Badge>}
-                              {hasCampaign && <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">Campaign</Badge>}
                               {plan.ai_generated_content && (
                                 <Badge variant="outline" className="border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300">
                                   <Sparkles className="w-3 h-3 mr-1" />

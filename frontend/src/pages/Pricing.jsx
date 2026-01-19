@@ -2,12 +2,10 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import api from "@/api/apiClient";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, CheckCircle, Lock, CreditCard, Zap, Crown, Tag, X, Loader2, Rocket, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -48,7 +46,6 @@ const FALLBACK_FEATURES = [
 export default function Pricing() {
   const navigate = useNavigate();
   const location = useLocation();
-  const queryClient = useQueryClient();
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [activating, setActivating] = useState(false);
@@ -73,15 +70,6 @@ export default function Pricing() {
     queryFn: async () => {
       const fetchedPlans = await api.entities.SubscriptionPlan.list();
       return fetchedPlans.length > 0 ? fetchedPlans : FALLBACK_PLANS;
-    },
-    staleTime: 0
-  });
-
-  const { data: activeCampaign, isLoading: loadingCampaign } = useQuery({
-    queryKey: ["active-campaign"],
-    queryFn: async () => {
-      const campaigns = await api.entities.MarketingCampaign.filter({ is_active: true });
-      return campaigns.length > 0 ? campaigns[0] : null;
     },
     staleTime: 0
   });
@@ -178,12 +166,7 @@ export default function Pricing() {
 
     let basePrice = parseFloat(plan.price);
     const originalPrice = basePrice;
-    
-    const isCampaignPlan = activeCampaign && activeCampaign.target_plan === planId;
-    if (isCampaignPlan && activeCampaign.discount_percentage) {
-      basePrice = basePrice * (1 - activeCampaign.discount_percentage / 100);
-    }
-    
+
     if (appliedCoupon) {
       if (appliedCoupon.discount_type === 'percentage') {
         basePrice = basePrice * (1 - appliedCoupon.discount_value / 100);
@@ -191,7 +174,7 @@ export default function Pricing() {
         basePrice = Math.max(0, basePrice - appliedCoupon.discount_value);
       }
     }
-    
+
     return { final: basePrice.toFixed(2), original: originalPrice.toFixed(2) };
   };
 
@@ -199,12 +182,7 @@ export default function Pricing() {
     const plan = plans.find(p => p.plan_id === planId);
     const startDate = new Date();
     const endDate = new Date();
-
-    if (activeCampaign && activeCampaign.target_plan === planId && activeCampaign.free_trial_duration) {
-      endDate.setDate(endDate.getDate() + parseInt(activeCampaign.free_trial_duration) + plan.duration);
-    } else {
-      endDate.setDate(endDate.getDate() + plan.duration);
-    }
+    endDate.setDate(endDate.getDate() + plan.duration);
 
     return { startDate, endDate };
   };
@@ -259,17 +237,13 @@ export default function Pricing() {
         plan.features.forEach(f => allFeatures.add(f));
       }
     });
-    
-    if (activeCampaign?.ai_generated_pricing_content_json?.feature_highlights) {
-      activeCampaign.ai_generated_pricing_content_json.feature_highlights.forEach(f => allFeatures.add(f));
-    }
-    
+
     return allFeatures.size > 0 ? Array.from(allFeatures) : FALLBACK_FEATURES;
   };
 
   const selectedPlanDetails = plans.find(p => p.plan_id === selectedPlan);
 
-  if (loadingUser || loadingPlans || loadingCampaign) {
+  if (loadingUser || loadingPlans) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 flex items-center justify-center transition-colors duration-300">
         <div className="text-center">
@@ -292,25 +266,16 @@ export default function Pricing() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-12"
         >
-          {activeCampaign?.ai_generated_pricing_content_json ? (
-            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900 dark:to-pink-900 text-purple-700 dark:text-purple-300 px-6 py-3 rounded-full text-base font-bold mb-6 border-2 border-purple-300 dark:border-purple-700">
-              <Sparkles className="w-5 h-5" />
-              {activeCampaign.ai_generated_pricing_content_json.campaign_banner_text || activeCampaign.ai_generated_pricing_content_json.page_headline}
-            </div>
-          ) : (
-            <div className="inline-flex items-center gap-2 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-4 py-2 rounded-full text-sm font-medium mb-6">
-              <Lock className="w-4 h-4" />
-              {isSubscribed ? "Change Your Plan" : "Subscription Required"}
-            </div>
-          )}
-          
+          <div className="inline-flex items-center gap-2 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-4 py-2 rounded-full text-sm font-medium mb-6">
+            <Lock className="w-4 h-4" />
+            {isSubscribed ? "Change Your Plan" : "Subscription Required"}
+          </div>
+
           <h1 className="text-5xl font-bold text-slate-900 dark:text-slate-100 mb-4">
-            {activeCampaign?.ai_generated_pricing_content_json?.page_headline || 
-             (isSubscribed ? "Change Your Plan" : "Choose Your Plan")}
+            {isSubscribed ? "Change Your Plan" : "Choose Your Plan"}
           </h1>
           <p className="text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-            {activeCampaign?.ai_generated_pricing_content_json?.page_subheadline || 
-             "Get unlimited access to all Resumakr features. Cancel anytime."}
+            Get unlimited access to all Resumakr features. Cancel anytime.
           </p>
         </motion.div>
 
@@ -323,15 +288,7 @@ export default function Pricing() {
               'md:grid-cols-2 lg:grid-cols-4'
             }`}>
               {plans.map((plan, index) => {
-                const isCampaignPlan = activeCampaign && activeCampaign.target_plan === plan.plan_id;
                 const isCurrentPlan = isSubscribed && currentUser?.subscription_plan === plan.plan_id;
-                const campaignDiscount = isCampaignPlan && activeCampaign.discount_percentage 
-                  ? activeCampaign.discount_percentage 
-                  : null;
-                const campaignFreeTrial = isCampaignPlan && activeCampaign.free_trial_duration
-                  ? activeCampaign.free_trial_duration
-                  : null;
-
                 const IconComponent = ICON_MAP[plan.icon_name] || Sparkles;
 
                 return (
@@ -345,8 +302,8 @@ export default function Pricing() {
                     <Card className={`relative p-6 border-2 bg-white dark:bg-slate-800 w-full ${
                       isCurrentPlan
                         ? "border-green-500 dark:border-green-400 shadow-xl"
-                        : plan.is_popular || isCampaignPlan
-                        ? "border-indigo-500 dark:border-indigo-400 shadow-xl" 
+                        : plan.is_popular
+                        ? "border-indigo-500 dark:border-indigo-400 shadow-xl"
                         : "border-slate-200 dark:border-slate-700"
                     } hover:shadow-2xl transition-all duration-300`}>
                       {isCurrentPlan && (
@@ -356,18 +313,14 @@ export default function Pricing() {
                           </Badge>
                         </div>
                       )}
-                      {!isCurrentPlan && (plan.is_popular || isCampaignPlan) && (
+                      {!isCurrentPlan && plan.is_popular && (
                         <div className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                          <Badge className={`${
-                            isCampaignPlan 
-                              ? "bg-purple-600 dark:bg-purple-500" 
-                              : "bg-indigo-600 dark:bg-indigo-500"
-                          } text-white px-4 py-1`}>
-                            {isCampaignPlan ? "🎉 Campaign Offer" : plan.badge_text || "Most Popular"}
+                          <Badge className="bg-indigo-600 dark:bg-indigo-500 text-white px-4 py-1">
+                            {plan.badge_text || "Most Popular"}
                           </Badge>
                         </div>
                       )}
-                      {!isCurrentPlan && !plan.is_popular && !isCampaignPlan && plan.badge_text && (
+                      {!isCurrentPlan && !plan.is_popular && plan.badge_text && (
                         <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                           <Badge className="bg-emerald-600 dark:bg-emerald-500 text-white px-4 py-1">
                             {plan.badge_text}
@@ -381,28 +334,13 @@ export default function Pricing() {
 
                       <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">{plan.name}</h3>
                       <div className="flex items-baseline gap-2 mb-1">
-                        {campaignDiscount ? (
-                          <>
-                            <span className="text-2xl line-through text-slate-400 dark:text-slate-500">${plan.price}</span>
-                            <span className="text-4xl font-bold text-purple-600 dark:text-purple-400">
-                              ${(plan.price * (1 - campaignDiscount / 100)).toFixed(2)}
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-4xl font-bold text-slate-900 dark:text-slate-100">${plan.price}</span>
-                        )}
+                        <span className="text-4xl font-bold text-slate-900 dark:text-slate-100">${plan.price}</span>
                         <span className="text-slate-600 dark:text-slate-400">{plan.period}</span>
                       </div>
-                      
-                      {campaignFreeTrial ? (
-                        <p className="text-sm font-bold text-purple-600 dark:text-purple-400 mb-6">
-                          + {campaignFreeTrial} days FREE trial!
-                        </p>
-                      ) : (
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-                          Access for {plan.duration} days
-                        </p>
-                      )}
+
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                        Access for {plan.duration} days
+                      </p>
 
                       <Button
                         onClick={() => handlePlanSelect(plan.plan_id)}
@@ -410,7 +348,7 @@ export default function Pricing() {
                         className={`w-full ${
                           isCurrentPlan
                             ? "bg-slate-300 dark:bg-slate-600 cursor-not-allowed"
-                            : plan.is_popular || isCampaignPlan || plan.badge_text
+                            : plan.is_popular || plan.badge_text
                             ? "bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                             : "bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-700"
                         }`}
@@ -451,14 +389,10 @@ export default function Pricing() {
             >
               <Card className="p-6 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
                 <p className="text-sm text-blue-900 dark:text-blue-100 leading-relaxed">
-                  {activeCampaign?.ai_generated_pricing_content_json?.disclaimer_text || (
-                    <>
-                      <strong>100% Transparent:</strong> All plans auto-renew for your convenience. 
-                      You can cancel anytime from your account settings. Cancellation takes effect at the 
-                      end of your current billing cycle, so you get full value from your subscription. 
-                      No partial refunds, but you'll have access until your paid period ends.
-                    </>
-                  )}
+                  <strong>100% Transparent:</strong> All plans auto-renew for your convenience.
+                  You can cancel anytime from your account settings. Cancellation takes effect at the
+                  end of your current billing cycle, so you get full value from your subscription.
+                  No partial refunds, but you'll have access until your paid period ends.
                 </p>
               </Card>
             </motion.div>

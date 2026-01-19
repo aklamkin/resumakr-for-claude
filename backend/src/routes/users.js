@@ -13,7 +13,7 @@ router.get('/', authenticate, requireAdmin, async (req, res) => {
     let sql = `SELECT
       id, email, full_name, role,
       is_subscribed, subscription_plan, subscription_end_date, subscription_price, subscription_started_at,
-      coupon_code_used, campaign_id,
+      coupon_code_used,
       oauth_provider, oauth_id, avatar_url,
       last_login, created_at, updated_at,
       CASE WHEN oauth_provider IS NULL THEN 'email' ELSE oauth_provider END as auth_method
@@ -205,7 +205,7 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
     const sql = `UPDATE users SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING
       id, email, full_name, role,
       is_subscribed, subscription_plan, subscription_end_date, subscription_price, subscription_started_at,
-      coupon_code_used, campaign_id,
+      coupon_code_used,
       oauth_provider, oauth_id, avatar_url,
       last_login, created_at, updated_at`;
 

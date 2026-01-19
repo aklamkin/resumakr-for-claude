@@ -19,7 +19,6 @@ import SettingsProviders from "./SettingsProviders";
 import SettingsPrompts from "./SettingsPrompts";
 import SettingsPlans from "./SettingsPlans";
 import SettingsCodes from "./SettingsCodes";
-import SettingsCampaigns from "./SettingsCampaigns";
 import SettingsHelp from "./SettingsHelp";
 import SettingsInterface from "./SettingsInterface";
 import SettingsUsers from "./SettingsUsers";
@@ -40,7 +39,6 @@ const PAGES = {
     SettingsPrompts: SettingsPrompts,
     SettingsPlans: SettingsPlans,
     SettingsCodes: SettingsCodes,
-    SettingsCampaigns: SettingsCampaigns,
     SettingsHelp: SettingsHelp,
     SettingsInterface: SettingsInterface,
     SettingsUsers: SettingsUsers,
@@ -100,7 +98,6 @@ function PagesContent() {
                 <Route path="/SettingsPrompts" element={<SettingsPrompts />} />
                 <Route path="/SettingsPlans" element={<SettingsPlans />} />
                 <Route path="/SettingsCodes" element={<SettingsCodes />} />
-                <Route path="/SettingsCampaigns" element={<SettingsCampaigns />} />
                 <Route path="/SettingsHelp" element={<SettingsHelp />} />
                 <Route path="/SettingsInterface" element={<SettingsInterface />} />
                 <Route path="/SettingsUsers" element={<SettingsUsers />} />

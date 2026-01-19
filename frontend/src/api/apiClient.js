@@ -226,31 +226,6 @@ export const api = {
         await client.delete(`/coupons/${id}`);
       }
     },
-    MarketingCampaign: {
-      async list() {
-        const { data } = await client.get('/campaigns');
-        return data;
-      },
-      async filter(filters) {
-        const { data } = await client.get('/campaigns', { params: filters });
-        return data;
-      },
-      async get(id) {
-        const { data } = await client.get(`/campaigns/${id}`);
-        return data;
-      },
-      async create(campaignData) {
-        const { data } = await client.post('/campaigns', campaignData);
-        return data;
-      },
-      async update(id, updates) {
-        const { data } = await client.put(`/campaigns/${id}`, updates);
-        return data;
-      },
-      async delete(id) {
-        await client.delete(`/campaigns/${id}`);
-      }
-    },
     FAQItem: {
       async list() {
         const { data } = await client.get('/faq');

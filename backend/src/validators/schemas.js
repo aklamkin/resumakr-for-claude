@@ -254,21 +254,6 @@ export const createPromptSchema = z.object({
 export const updatePromptSchema = createPromptSchema.partial();
 
 // ============================================
-// Campaign Schemas
-// ============================================
-
-export const createCampaignSchema = z.object({
-  name: safeString(100).refine(val => val.trim().length > 0, 'Name is required'),
-  description: z.string().max(1000).optional().default(''),
-  start_date: z.string().datetime().optional(),
-  end_date: z.string().datetime().optional(),
-  is_active: z.boolean().optional().default(true),
-  config: z.record(z.unknown()).optional().default({})
-});
-
-export const updateCampaignSchema = createCampaignSchema.partial();
-
-// ============================================
 // User Management Schemas (Admin)
 // ============================================
 
