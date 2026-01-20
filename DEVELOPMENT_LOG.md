@@ -1,12 +1,20 @@
-# Development Log - December 2025
+# Development Log
 
-**Session Date**: December 30, 2025
-**Last Documented**: November 28, 2024 (CLAUDE.md)
-**Status**: Production-ready Stripe integration and paywall protection implemented
+**Last Updated**: January 19, 2026
+**Status**: Stripe integration fully functional with checkout.session.completed webhook fix
 
 ---
 
 ## Table of Contents
+
+### January 2026
+8. [Stripe Webhook Critical Fix - checkout.session.completed](#stripe-webhook-critical-fix---checkoutsessioncompleted)
+9. [Subscription Success Redirect Fix](#subscription-success-redirect-fix)
+10. [MyResumes React Query Refactor](#myresumes-react-query-refactor)
+11. [Marketing Campaigns Removal](#marketing-campaigns-removal)
+12. [Stripe Auto-Sync for Subscription Plans](#stripe-auto-sync-for-subscription-plans)
+
+### December 2025
 1. [Google OAuth Configuration](#google-oauth-configuration)
 2. [OAuth UI Cleanup](#oauth-ui-cleanup)
 3. [Stripe Payment Integration](#stripe-payment-integration)
@@ -14,6 +22,610 @@
 5. [Configuration Requirements](#configuration-requirements)
 6. [Testing Instructions](#testing-instructions)
 7. [Remaining Tasks](#remaining-tasks)
+
+---
+
+# January 2026 Session
+
+**Session Date**: January 19, 2026
+**Previous State**: Stripe checkout completed payment but subscription was not being activated
+**Current State**: Full payment flow working - checkout → webhook → subscription activation → redirect
+
+---
+
+## Stripe Webhook Critical Fix - checkout.session.completed
+
+### Status: ✅ FIXED
+
+### The Problem
+
+After completing payment through Stripe Checkout, users were redirected back to the app but their subscription was not activated. They would see "Subscribe To Get Started" even after successful payment.
+
+**Root Cause Analysis:**
+
+The webhook handler was missing the `checkout.session.completed` event handler. This is the **primary** event that Stripe fires immediately when a Checkout Session payment succeeds. The existing code only handled `customer.subscription.created`, which has timing issues and relies on metadata that may not always be available.
+
+**Event Flow (Before Fix):**
+```
+1. User clicks "Continue to Payment"
+2. Stripe Checkout opens
+3. User completes payment
+4. Stripe fires checkout.session.completed    ← NOT HANDLED (BUG!)
+5. Stripe fires customer.subscription.created ← Handled but may fail due to timing
+6. User redirected to /subscription-success
+7. Frontend fetches user data
+8. User still shows as unsubscribed
+```
+
+**Event Flow (After Fix):**
+```
+1. User clicks "Continue to Payment"
+2. Stripe Checkout opens
+3. User completes payment
+4. Stripe fires checkout.session.completed    ← NOW HANDLED
+5. Database updated: is_subscribed = true
+6. User redirected to /subscription-success
+7. Frontend fetches user data (now correct)
+8. User sees subscription active
+```
+
+### The Solution
+
+#### 1. Added checkout.session.completed Handler to Webhook Route
+
+**File:** `backend/src/routes/webhooks.js`
+
+**Change:**
+```javascript
+// Handle different event types
+switch (event.type) {
+  case 'checkout.session.completed':
+    // This is the primary event for successful Stripe Checkout payments
+    await stripeService.handleCheckoutSessionCompleted(event.data.object);
+    break;
+
+  case 'customer.subscription.created':
+    await stripeService.handleSubscriptionCreated(event.data.object);
+    break;
+  // ... rest of handlers
+}
+```
+
+**Why This Event?**
+- `checkout.session.completed` fires immediately when payment succeeds
+- Contains `client_reference_id` which we set to the user ID during checkout creation
+- Contains `subscription` ID which lets us fetch full subscription details
+- Is the recommended primary handler for Stripe Checkout integrations
+
+#### 2. Implemented handleCheckoutSessionCompleted Function
+
+**File:** `backend/src/services/stripe.js`
+
+**New Function:**
+```javascript
+/**
+ * Handle checkout.session.completed webhook
+ * This is the PRIMARY event for Stripe Checkout - fires immediately when payment succeeds
+ */
+export async function handleCheckoutSessionCompleted(session) {
+  ensureStripeConfigured();
+
+  const userId = session.client_reference_id || session.metadata?.user_id;
+
+  if (!userId) {
+    console.error('No user_id in checkout session');
+    return;
+  }
+
+  console.log(`Processing checkout.session.completed for user ${userId}`);
+
+  // For subscription mode, the subscription is created automatically
+  if (session.mode === 'subscription' && session.subscription) {
+    // Retrieve the full subscription object from Stripe
+    const subscription = await stripe.subscriptions.retrieve(session.subscription);
+
+    const subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+    const priceId = subscription.items.data[0].price.id;
+
+    // Get plan from database by stripe_price_id
+    const planResult = await query(
+      'SELECT plan_id FROM subscription_plans WHERE stripe_price_id = $1',
+      [priceId]
+    );
+    const planId = planResult.rows[0]?.plan_id || 'premium';
+
+    await query(
+      `UPDATE users SET
+        is_subscribed = true,
+        subscription_plan = $1,
+        subscription_end_date = $2,
+        stripe_subscription_id = $3,
+        subscription_started_at = NOW(),
+        updated_at = NOW()
+      WHERE id = $4`,
+      [planId, subscriptionEndDate, subscription.id, userId]
+    );
+
+    console.log(`Subscription activated for user ${userId}, plan: ${planId}, ends: ${subscriptionEndDate}`);
+  } else {
+    // For one-time payments (if we ever support them)
+    console.log(`Non-subscription checkout completed for user ${userId}`);
+  }
+}
+```
+
+**Key Design Decisions:**
+
+1. **User ID Source Priority:**
+   - Primary: `client_reference_id` (set during checkout session creation)
+   - Fallback: `metadata.user_id` (also set during creation)
+   - This dual approach ensures we always find the user
+
+2. **Full Subscription Retrieval:**
+   - The checkout session only contains the subscription ID, not full details
+   - We call `stripe.subscriptions.retrieve()` to get period end date, price, etc.
+   - This ensures accurate subscription end date calculation
+
+3. **Plan ID Lookup:**
+   - Map Stripe's `price_id` back to our internal `plan_id`
+   - Fallback to 'premium' if plan not found (graceful degradation)
+
+4. **Comprehensive Database Update:**
+   - `is_subscribed = true` - Immediately activates subscription
+   - `subscription_plan` - Links to our internal plan
+   - `subscription_end_date` - From Stripe's `current_period_end`
+   - `stripe_subscription_id` - For future Stripe API calls
+   - `subscription_started_at` - Audit trail
+   - `updated_at` - Standard timestamp update
+
+#### 3. Added to Service Exports
+
+**File:** `backend/src/services/stripe.js`
+
+```javascript
+export default {
+  getOrCreateCustomer,
+  createCheckoutSession,
+  createBillingPortalSession,
+  cancelSubscription,
+  verifyWebhookSignature,
+  handleCheckoutSessionCompleted,  // ← Added
+  handleSubscriptionCreated,
+  handleSubscriptionUpdated,
+  handleSubscriptionDeleted,
+  handlePaymentSucceeded,
+  handleInvoicePaymentSucceeded,
+  // ... other exports
+};
+```
+
+### Webhook Event Data Structure
+
+Understanding the data structure is crucial for debugging:
+
+**checkout.session.completed event:**
+```json
+{
+  "id": "cs_test_...",
+  "object": "checkout.session",
+  "mode": "subscription",
+  "client_reference_id": "user-uuid-here",
+  "customer": "cus_...",
+  "subscription": "sub_...",
+  "payment_status": "paid",
+  "status": "complete",
+  "metadata": {
+    "user_id": "user-uuid-here"
+  }
+}
+```
+
+**subscription object (from retrieve call):**
+```json
+{
+  "id": "sub_...",
+  "status": "active",
+  "current_period_end": 1737504000,
+  "items": {
+    "data": [{
+      "price": {
+        "id": "price_...",
+        "product": "prod_..."
+      }
+    }]
+  }
+}
+```
+
+### Why customer.subscription.created Alone Was Insufficient
+
+The existing `handleSubscriptionCreated` handler has a subtle issue:
+
+```javascript
+export async function handleSubscriptionCreated(subscription) {
+  const userId = subscription.metadata.user_id;  // ← Relies on metadata
+
+  if (!userId) {
+    console.error('No user_id in subscription metadata');
+    return;  // ← Silently fails!
+  }
+  // ...
+}
+```
+
+**Problem:** The metadata on the subscription object may not be immediately available or may be empty in some edge cases. The `checkout.session.completed` event is more reliable because:
+
+1. It fires first (before subscription.created in most cases)
+2. It has `client_reference_id` which we explicitly set
+3. It has a direct reference to the subscription ID for lookup
+
+### Git Commit
+
+```
+commit 471d4b93
+Fix subscription activation via checkout.session.completed webhook
+
+The core issue was that Stripe Checkout fires checkout.session.completed
+as the primary event when payment succeeds, but this event wasn't being
+handled. The webhook handler only processed customer.subscription.created
+which has timing/metadata issues.
+
+Added handleCheckoutSessionCompleted handler in stripe.js that:
+- Extracts user ID from client_reference_id or metadata
+- Retrieves the full subscription from Stripe
+- Updates user's subscription status in database immediately
+
+This ensures the subscription is activated right when payment completes,
+before the user is redirected back to the app.
+```
+
+---
+
+## Subscription Success Redirect Fix
+
+### Status: ✅ FIXED
+
+### The Problem
+
+After payment, users were seeing a blank screen with just the sidebar instead of being redirected to My Resumes.
+
+**Root Cause:** Route path mismatch
+
+### The Solution
+
+**File:** `frontend/src/pages/SubscriptionSuccess.jsx`
+
+**Before (Bug):**
+```javascript
+useEffect(() => {
+  const timer = setTimeout(async () => {
+    try {
+      await queryClient.invalidateQueries(["current-user"]);
+      navigate("/my-resumes");  // ← WRONG CASE!
+    } catch (err) {
+      // ...
+    }
+  }, 2000);
+  return () => clearTimeout(timer);
+}, [queryClient, navigate]);
+```
+
+**After (Fix):**
+```javascript
+useEffect(() => {
+  const timer = setTimeout(async () => {
+    try {
+      await queryClient.invalidateQueries(["current-user"]);
+      navigate("/MyResumes");  // ← Correct case matches route
+    } catch (err) {
+      // ...
+    }
+  }, 2000);
+  return () => clearTimeout(timer);
+}, [queryClient, navigate]);
+```
+
+**Why This Matters:**
+
+React Router routes are case-sensitive. The routes are defined in `pages/index.jsx`:
+
+```javascript
+<Route path="/MyResumes" element={<MyResumes />} />
+```
+
+Navigating to `/my-resumes` (lowercase) doesn't match any route, resulting in a blank Layout with no content.
+
+---
+
+## MyResumes React Query Refactor
+
+### Status: ✅ FIXED
+
+### The Problem
+
+Even after fixing the redirect, the MyResumes page wasn't reflecting the updated subscription status. Users still saw "Subscribe To Get Started" after successful payment.
+
+**Root Cause:** MyResumes used a separate `api.auth.me()` call in a local `useEffect`, not using React Query's shared cache.
+
+### The Solution
+
+**File:** `frontend/src/pages/MyResumes.jsx`
+
+**Before (Bug):**
+```javascript
+const [user, setUser] = useState(null);
+const [checkingSubscription, setCheckingSubscription] = useState(true);
+
+useEffect(() => {
+  const fetchUser = async () => {
+    try {
+      const userData = await api.auth.me();
+      setUser(userData);
+    } finally {
+      setCheckingSubscription(false);
+    }
+  };
+  fetchUser();
+}, []);
+```
+
+**After (Fix):**
+```javascript
+// Use React Query for user data - this ensures we get fresh data after subscription
+const { data: currentUser, isLoading: checkingSubscription } = useQuery({
+  queryKey: ["current-user"],
+  queryFn: () => api.auth.me(),
+  staleTime: 0, // Always fetch fresh data
+  retry: false,
+});
+
+// Compute subscription status from user data
+const isSubscribed = React.useMemo(() => {
+  if (!currentUser) return false;
+  if (currentUser.is_subscribed && currentUser.subscription_end_date) {
+    const endDate = new Date(currentUser.subscription_end_date);
+    return endDate > new Date();
+  }
+  return false;
+}, [currentUser]);
+```
+
+**Why This Matters:**
+
+React Query maintains a shared cache across components. The key insight is:
+
+1. **SubscriptionSuccess.jsx** calls:
+   ```javascript
+   queryClient.invalidateQueries(["current-user"]);
+   ```
+
+2. This invalidates the cache entry for `["current-user"]`
+
+3. **MyResumes.jsx** uses the same query key:
+   ```javascript
+   useQuery({ queryKey: ["current-user"], ... });
+   ```
+
+4. When navigating to MyResumes, React Query automatically fetches fresh data because the cache was invalidated
+
+**Before:** MyResumes fetched user data independently with `useState` + `useEffect`, completely bypassing React Query's cache. The `invalidateQueries` call in SubscriptionSuccess had no effect.
+
+**After:** Both pages share the same React Query cache key, ensuring data consistency across navigation.
+
+### Additional Details
+
+**staleTime: 0** - Forces React Query to always fetch fresh data, never serve stale cache. Critical for subscription status which may have just changed.
+
+**retry: false** - Don't retry failed requests. If the user is logged out, we want to fail fast.
+
+**useMemo for isSubscribed** - Efficiently compute subscription status from user data without re-computing on every render.
+
+---
+
+## Marketing Campaigns Removal
+
+### Status: ✅ COMPLETE
+
+### What Was Removed
+
+The Marketing Campaigns feature was removed entirely from the codebase as it was:
+1. Not being used in production
+2. Adding complexity to the Stripe checkout flow
+3. Conflicting with Stripe's native trial period handling
+
+### Files Deleted
+
+**Backend:**
+- `backend/src/routes/campaigns.js` - Campaigns API routes
+
+**Frontend:**
+- `frontend/src/pages/SettingsCampaigns.jsx` - Admin campaigns page
+- `frontend/src/components/admin/AdminMonetization.jsx` - Admin monetization dashboard
+
+### Files Modified
+
+**Backend:**
+- `backend/src/server.js` - Removed campaign route registration
+- `backend/src/validators/schemas.js` - Removed campaign validation schemas
+
+**Frontend:**
+- `frontend/src/components/Layout.jsx` - Removed "Campaigns" nav item from admin menu
+- `frontend/src/pages/index.jsx` - Removed campaigns route
+- `frontend/src/api/apiClient.js` - Removed campaign API methods
+- `frontend/src/pages/Pricing.jsx` - Removed campaign-related code
+- `frontend/src/components/admin/SubscriptionPlanManager.jsx` - Removed campaign references
+
+### Design Decision
+
+**Why Remove Instead of Keep?**
+
+1. **Stripe Native Trials**: Stripe has built-in trial period support through `subscription_data.trial_period_days`. Duplicating this in our app created confusion.
+
+2. **Coupon Codes Suffice**: Marketing discounts are better handled through coupon codes which:
+   - Sync with Stripe automatically at checkout
+   - Are created/managed in our admin UI
+   - Apply real discounts in Stripe (not fake frontend discounts)
+
+3. **Simpler Checkout Flow**: Removing campaign logic simplified:
+   - `createCheckoutSession` - No more campaign trial injection
+   - `Pricing.jsx` - No more campaign banner/modal
+   - Webhook handlers - No campaign-specific logic
+
+### How to Handle Free Trials Now
+
+Configure free trials directly in Stripe:
+1. Go to Stripe Dashboard → Products
+2. Edit the price and add trial days
+3. Or use `subscription_data.trial_period_days` in checkout session creation
+
+### Git Commit
+
+```
+commit 9b02b7c3
+Remove Marketing Campaigns feature
+
+Campaign removal completed:
+- Backend: campaigns.js route deleted, server registration removed, validator schemas cleaned
+- Frontend: SettingsCampaigns.jsx and AdminMonetization.jsx deleted, Layout nav item removed
+- API client methods removed, routes removed
+- Pricing.jsx and SubscriptionPlanManager.jsx cleaned up
+```
+
+---
+
+## Stripe Auto-Sync for Subscription Plans
+
+### Status: ✅ COMPLETE
+
+### Overview
+
+Implemented automatic synchronization of subscription plans between the database and Stripe. When plans are created or updated in the admin UI, they are automatically synced to Stripe.
+
+### Implementation Details
+
+**File:** `backend/src/services/stripe.js`
+
+**New Functions:**
+
+```javascript
+/**
+ * Create a Stripe Product for a subscription plan
+ */
+export async function createStripeProduct(planData) {
+  const product = await stripe.products.create({
+    name: planData.name,
+    description: `${planData.name} - ${planData.duration} ${planData.period} access`,
+    metadata: {
+      plan_id: planData.plan_id,
+      resumakr_plan: 'true'
+    }
+  });
+  return product;
+}
+
+/**
+ * Create a Stripe Price for a product
+ */
+export async function createStripePrice(productId, planData) {
+  // Convert period to Stripe interval format
+  let interval = 'month';
+  let intervalCount = 1;
+
+  if (planData.period === 'day') {
+    interval = 'day';
+    intervalCount = planData.duration;
+  } else if (planData.period === 'week') {
+    // ... etc
+  }
+
+  const price = await stripe.prices.create({
+    product: productId,
+    unit_amount: Math.round(parseFloat(planData.price) * 100),
+    currency: 'usd',
+    recurring: {
+      interval: interval,
+      interval_count: intervalCount
+    },
+    metadata: { plan_id: planData.plan_id }
+  });
+  return price;
+}
+
+/**
+ * Master sync function - creates or updates plan in Stripe
+ */
+export async function syncPlanToStripe(planData, options = {}) {
+  // If no Stripe product ID, create new product + price
+  if (!planData.stripe_product_id && createIfMissing) {
+    product = await createStripeProduct(planData);
+    price = await createStripePrice(product.id, planData);
+    return { stripe_product_id: product.id, stripe_price_id: price.id, created: true };
+  }
+
+  // If has Stripe product ID, update and check if price changed
+  if (planData.stripe_product_id) {
+    product = await updateStripeProduct(planData.stripe_product_id, planData);
+
+    // Check if price/billing changed - requires new Stripe price
+    if (priceChanged || intervalChanged) {
+      await archiveStripePrice(planData.stripe_price_id);
+      price = await createStripePrice(planData.stripe_product_id, planData);
+      return { stripe_price_id: price.id, priceChanged: true };
+    }
+  }
+}
+```
+
+### Key Design Decisions
+
+1. **Products vs Prices in Stripe:**
+   - Products are the "thing" being sold (e.g., "Weekly Plan")
+   - Prices are how much and how often (e.g., "$2.99/week")
+   - Stripe allows multiple prices per product
+
+2. **Price Immutability:**
+   - Stripe prices cannot be modified (immutable)
+   - When price or billing interval changes, we:
+     1. Archive the old price (set `active: false`)
+     2. Create a new price
+     3. Update our database with the new `stripe_price_id`
+
+3. **Metadata Tracking:**
+   - All Stripe products/prices include our `plan_id` in metadata
+   - Makes it easy to correlate Stripe data with our database
+   - `resumakr_plan: 'true'` helps filter our products in Stripe Dashboard
+
+4. **Period Conversion:**
+   - Our database stores: `duration: 7`, `period: 'day'`
+   - Stripe uses: `interval: 'day'`, `interval_count: 7`
+   - Conversion happens in `createStripePrice`
+
+### Usage in Admin UI
+
+**File:** `frontend/src/components/admin/SubscriptionPlanManager.jsx`
+
+When admin saves a plan:
+1. Frontend calls `/api/subscriptions/plans` (POST or PUT)
+2. Backend saves to database
+3. Backend calls `syncPlanToStripe(planData)`
+4. Stripe product/price created or updated
+5. `stripe_product_id` and `stripe_price_id` saved to database
+6. Plan is now available for checkout
+
+### Git Commit
+
+```
+commit 79673b4f
+Phase 2: Implement Stripe auto-sync for subscription plans
+```
+
+---
+
+# December 2025 Session
+
+**Session Date**: December 30, 2025
+**Last Documented**: November 28, 2024 (CLAUDE.md)
+**Status**: Initial Stripe integration and paywall protection implemented
 
 ---
 
@@ -601,45 +1213,32 @@ export const requireSubscription = async (req, res, next) => {
 
 ---
 
-### Marketing Campaign Trial Support
+### Trial Support (Updated January 2026)
 
-**How Trials Work:**
+**Note:** Marketing Campaigns feature was removed. Free trials are now handled directly through Stripe.
 
-1. **Campaign Creation:**
-```sql
-UPDATE marketing_campaigns
-SET free_trial_duration = 7,  -- 7 days free
-    target_plan = 'weekly'
-WHERE id = 'campaign-id';
-```
+**How to Configure Free Trials:**
 
-2. **Checkout with Trial:**
+1. **Via Stripe Dashboard:**
+   - Go to Stripe Dashboard → Products
+   - Edit the price and add trial days
+
+2. **Via Checkout Session (programmatic):**
 ```javascript
 // In stripe.js createCheckoutSession()
-if (campaignTrialDays) {
-  checkoutSession.subscription_data = {
-    trial_period_days: campaignTrialDays
-  };
-}
+sessionParams.subscription_data = {
+  trial_period_days: 7  // 7 days free
+};
 ```
 
-3. **Subscription Activation:**
-- User subscribes through campaign
-- Stripe applies trial period
-- User gets immediate access (`is_subscribed = true`)
-- `subscription_end_date` set to trial end + billing period
-- Webhook activates subscription on `subscription.created`
-
-4. **Trial End:**
-- Stripe charges user automatically
-- Webhook updates subscription status
-- If payment fails, subscription ends
-
-**Benefits:**
-- No fake subscription logic
-- Real payment processing
-- Stripe handles trial → paid transition
-- Webhook keeps database in sync
+**How It Works:**
+1. User completes checkout with trial period configured
+2. Stripe creates subscription with `status: 'trialing'`
+3. `checkout.session.completed` webhook fires
+4. Our handler activates subscription immediately
+5. User has access during trial
+6. Stripe auto-charges when trial ends
+7. If payment fails, `customer.subscription.deleted` webhook updates our database
 
 ---
 
@@ -741,11 +1340,14 @@ VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
    - Dashboard → Developers → Webhooks
    - Add endpoint: `https://yourdomain.com/api/webhooks/stripe`
    - Select events:
+     - **`checkout.session.completed`** ← CRITICAL: Primary handler for Stripe Checkout
      - `customer.subscription.created`
      - `customer.subscription.updated`
      - `customer.subscription.deleted`
      - `payment_intent.succeeded`
      - `invoice.payment_succeeded`
+     - `invoice.payment_failed`
+     - `customer.subscription.trial_will_end`
    - Copy Webhook Secret (`whsec_...`)
 
 5. **Test Mode:**
@@ -926,6 +1528,17 @@ INSERT INTO marketing_campaigns (
 
 ## Git Commits Reference
 
+**Relevant Commits (January 2026):**
+
+1. `471d4b93` - **Fix subscription activation via checkout.session.completed webhook** (CRITICAL)
+2. `a962b47a` - Fix SubscriptionSuccess redirect and MyResumes React Query refactor
+3. `9b02b7c3` - Remove Marketing Campaigns feature
+4. `79673b4f` - Phase 2: Implement Stripe auto-sync for subscription plans
+5. `d4102366` - Fix sidebar footer positioning
+6. `db030120` - Fix system theme mode to respect system preference
+7. `950dac02` - Fix sidebar user info to stick to bottom
+8. `29373b71` - Fix theme persistence and add user info to sidebar
+
 **Relevant Commits (Dec 30, 2025):**
 
 1. `068f565d` - Implement Stripe payment backend infrastructure
@@ -933,7 +1546,14 @@ INSERT INTO marketing_campaigns (
 3. `9c732062` - Implement paywall protection on API endpoints
 4. `446f0c1f` - Update paywall to require subscription for all features
 
-**Files Changed:**
+**Files Changed (January 2026):**
+- `backend/src/routes/webhooks.js` - Added checkout.session.completed handler
+- `backend/src/services/stripe.js` - Added handleCheckoutSessionCompleted function
+- `frontend/src/pages/SubscriptionSuccess.jsx` - Fixed route case
+- `frontend/src/pages/MyResumes.jsx` - Refactored to use React Query
+- Multiple files - Removed Marketing Campaigns feature
+
+**Files Changed (December 2025):**
 - Backend: 8 files modified, 5 files created
 - Frontend: 3 files modified, 1 file created
 - Migrations: 1 file created
@@ -1090,18 +1710,21 @@ If you're picking up this work, consider:
 
 ## Summary for Claude/AI
 
-**What's Done:**
+**What's Done (as of January 19, 2026):**
 - ✅ Google OAuth configured and working
 - ✅ Stripe backend completely implemented
 - ✅ Stripe frontend checkout flow complete
+- ✅ **checkout.session.completed webhook handler** - CRITICAL FIX
 - ✅ Paywall protection on all API endpoints
-- ✅ Test discount code created
+- ✅ Test discount code created (`TESTFREE`)
 - ✅ Database migrations applied
 - ✅ Webhooks handling subscription lifecycle
+- ✅ Marketing Campaigns feature removed (simplified)
+- ✅ Stripe auto-sync for subscription plans
+- ✅ React Query cache consistency for user data
 
 **What's Left:**
 - ⏳ Frontend paywall UI components
-- ⏳ End-to-end testing with real Stripe test cards
 - ⏳ Production Stripe configuration
 
 **Quick Start for Testing:**
@@ -1111,13 +1734,94 @@ If you're picking up this work, consider:
 4. Test card: `4242 4242 4242 4242`
 
 **Critical Context:**
+- **Webhook order matters**: `checkout.session.completed` is the PRIMARY handler, not `customer.subscription.created`
 - Paywall model is subscription-required (not freemium)
-- Marketing campaigns provide free trials
+- Free trials are handled via Stripe (not marketing campaigns)
 - All resume operations protected
 - Webhook processing is idempotent
+- React Query `["current-user"]` key is shared across pages
+- Route paths are case-sensitive (`/MyResumes` not `/my-resumes`)
 - .env files are in .gitignore (don't commit!)
 
 ---
 
-**Last Updated:** December 30, 2025
-**Next Session Should Start With:** Frontend paywall UI components or end-to-end testing
+## Troubleshooting Guide
+
+### Problem: Subscription not activating after payment
+
+**Symptoms:**
+- User completes Stripe Checkout successfully
+- Redirected to app but still shows "Subscribe To Get Started"
+- Database shows `is_subscribed = false`
+
+**Check:**
+1. **Webhook received?**
+   ```sql
+   SELECT * FROM subscription_events
+   WHERE event_type = 'checkout.session.completed'
+   ORDER BY created_at DESC LIMIT 5;
+   ```
+
+2. **Webhook processed?**
+   - Check backend logs for: `Processing checkout.session.completed for user {userId}`
+   - If missing, webhook handler may not be registered
+
+3. **client_reference_id present?**
+   - Check the event data in `subscription_events.data`
+   - Must have `client_reference_id` set to user UUID
+
+4. **Stripe webhook secret correct?**
+   - Error in logs: `Webhook Error: No signatures found matching the expected signature`
+   - Solution: Update `STRIPE_WEBHOOK_SECRET` in `.env`
+
+### Problem: Blank screen after payment redirect
+
+**Symptoms:**
+- Payment completes
+- Redirected to app
+- Shows Layout (sidebar) but no page content
+
+**Check:**
+1. **Route case sensitivity:**
+   - Must navigate to `/MyResumes` not `/my-resumes`
+   - React Router is case-sensitive
+
+2. **Console errors:**
+   - Check browser console for navigation errors
+
+### Problem: Subscription status not updating in UI
+
+**Symptoms:**
+- Database shows `is_subscribed = true`
+- UI still shows unsubscribed state
+
+**Check:**
+1. **React Query cache invalidation:**
+   - `SubscriptionSuccess.jsx` must call `queryClient.invalidateQueries(["current-user"])`
+   - Target page must use same query key: `useQuery({ queryKey: ["current-user"], ... })`
+
+2. **staleTime setting:**
+   - Should be `staleTime: 0` to always fetch fresh data
+
+### Problem: Webhook signature verification fails
+
+**Symptoms:**
+- Webhook endpoint returns 400
+- Error: `Webhook Error: Webhook signature verification failed`
+
+**Check:**
+1. **Raw body middleware order:**
+   ```javascript
+   // In server.js - MUST come before express.json()
+   app.use('/api/webhooks', webhookRoutes);
+   app.use(express.json({ limit: '10mb' }));
+   ```
+
+2. **Stripe webhook secret:**
+   - Must match the webhook endpoint's secret from Stripe Dashboard
+   - Different secrets for test vs production
+
+---
+
+**Last Updated:** January 19, 2026
+**Next Session Should Start With:** Production configuration and deployment testing
