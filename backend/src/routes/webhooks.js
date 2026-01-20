@@ -46,6 +46,11 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
 
     // Handle different event types
     switch (event.type) {
+      case 'checkout.session.completed':
+        // This is the primary event for successful Stripe Checkout payments
+        await stripeService.handleCheckoutSessionCompleted(event.data.object);
+        break;
+
       case 'customer.subscription.created':
         await stripeService.handleSubscriptionCreated(event.data.object);
         break;

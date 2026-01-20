@@ -178,6 +178,53 @@ export function verifyWebhookSignature(payload, signature) {
 }
 
 /**
+ * Handle checkout.session.completed webhook
+ * This is the PRIMARY event for Stripe Checkout - fires immediately when payment succeeds
+ */
+export async function handleCheckoutSessionCompleted(session) {
+  ensureStripeConfigured();
+
+  const userId = session.client_reference_id || session.metadata?.user_id;
+
+  if (!userId) {
+    console.error('No user_id in checkout session');
+    return;
+  }
+
+  console.log(`Processing checkout.session.completed for user ${userId}`);
+
+  // For subscription mode, the subscription is created automatically
+  if (session.mode === 'subscription' && session.subscription) {
+    // Retrieve the full subscription object from Stripe
+    const subscription = await stripe.subscriptions.retrieve(session.subscription);
+
+    const subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+    const priceId = subscription.items.data[0].price.id;
+
+    // Get plan from database by stripe_price_id
+    const planResult = await query('SELECT plan_id FROM subscription_plans WHERE stripe_price_id = $1', [priceId]);
+    const planId = planResult.rows[0]?.plan_id || 'premium';
+
+    await query(
+      `UPDATE users SET
+        is_subscribed = true,
+        subscription_plan = $1,
+        subscription_end_date = $2,
+        stripe_subscription_id = $3,
+        subscription_started_at = NOW(),
+        updated_at = NOW()
+      WHERE id = $4`,
+      [planId, subscriptionEndDate, subscription.id, userId]
+    );
+
+    console.log(`Subscription activated for user ${userId}, plan: ${planId}, ends: ${subscriptionEndDate}`);
+  } else {
+    // For one-time payments (if we ever support them)
+    console.log(`Non-subscription checkout completed for user ${userId}`);
+  }
+}
+
+/**
  * Handle subscription created webhook
  */
 export async function handleSubscriptionCreated(subscription) {
@@ -535,6 +582,7 @@ export default {
   createBillingPortalSession,
   cancelSubscription,
   verifyWebhookSignature,
+  handleCheckoutSessionCompleted,
   handleSubscriptionCreated,
   handleSubscriptionUpdated,
   handleSubscriptionDeleted,
