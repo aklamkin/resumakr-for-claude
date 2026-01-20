@@ -23,7 +23,7 @@ export default function SubscriptionSuccess() {
         // Invalidate user query to fetch updated subscription status
         await queryClient.invalidateQueries(["current-user"]);
         // Redirect directly to My Resumes page
-        navigate("/my-resumes");
+        navigate("/MyResumes");
       } catch (err) {
         console.error("Error refreshing user data:", err);
         setError("Failed to verify subscription. Please refresh the page.");

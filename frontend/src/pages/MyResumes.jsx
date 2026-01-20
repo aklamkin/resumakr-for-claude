@@ -21,8 +21,6 @@ export default function MyResumes() {
   const [sortBy, setSortBy] = useState("updated");
   const [sortDirection, setSortDirection] = useState("desc");
   const [viewMode, setViewMode] = useState("grid");
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [checkingSubscription, setCheckingSubscription] = useState(true);
   const queryClient = useQueryClient();
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
@@ -36,34 +34,23 @@ export default function MyResumes() {
   });
   const [notification, setNotification] = useState({ open: false, title: "", message: "", type: "success" });
 
-  React.useEffect(() => {
-    checkSubscription();
-  }, []);
+  // Use React Query for user data - this ensures we get fresh data after subscription
+  const { data: currentUser, isLoading: checkingSubscription } = useQuery({
+    queryKey: ["current-user"],
+    queryFn: () => api.auth.me(),
+    staleTime: 0, // Always fetch fresh data
+    retry: false,
+  });
 
-  const checkSubscription = async () => {
-    try {
-      const user = await api.auth.me();
-      
-      if (user.is_subscribed && user.subscription_end_date) {
-        const endDate = new Date(user.subscription_end_date);
-        const now = new Date();
-        const active = endDate > now;
-        setIsSubscribed(active);
-        
-        // Only update is_subscribed to false if truly expired
-        if (!active) {
-          await api.auth.updateMe({ is_subscribed: false });
-        }
-      } else {
-        setIsSubscribed(false);
-      }
-    } catch (err) {
-      console.error("Error checking subscription:", err);
-      setIsSubscribed(false);
-    } finally {
-      setCheckingSubscription(false);
+  // Compute subscription status from user data
+  const isSubscribed = React.useMemo(() => {
+    if (!currentUser) return false;
+    if (currentUser.is_subscribed && currentUser.subscription_end_date) {
+      const endDate = new Date(currentUser.subscription_end_date);
+      return endDate > new Date();
     }
-  };
+    return false;
+  }, [currentUser]);
 
   const handleSubscriptionRequired = () => {
     navigate(createPageUrl("Pricing?returnUrl=MyResumes"));
@@ -87,19 +74,15 @@ export default function MyResumes() {
   };
 
   const { data: resumes = [], isLoading, refetch } = useQuery({
-    queryKey: ['my-resumes'],
-    queryFn: async () => {
-      const user = await api.auth.me();
-      return api.entities.Resume.filter({ created_by: user.email }, "-updated_date");
-    },
+    queryKey: ['my-resumes', currentUser?.email],
+    queryFn: () => api.entities.Resume.filter({ created_by: currentUser.email }, "-updated_date"),
+    enabled: !!currentUser?.email,
   });
 
   const { data: allVersions = [] } = useQuery({
-    queryKey: ['all-resume-versions'],
-    queryFn: async () => {
-      const user = await api.auth.me();
-      return api.entities.ResumeVersion.filter({ created_by: user.email }); 
-    },
+    queryKey: ['all-resume-versions', currentUser?.email],
+    queryFn: () => api.entities.ResumeVersion.filter({ created_by: currentUser.email }),
+    enabled: !!currentUser?.email,
   });
 
   const versionCounts = React.useMemo(() => {
