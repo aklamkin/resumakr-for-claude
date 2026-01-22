@@ -182,45 +182,69 @@ export function verifyWebhookSignature(payload, signature) {
  * This is the PRIMARY event for Stripe Checkout - fires immediately when payment succeeds
  */
 export async function handleCheckoutSessionCompleted(session) {
-  ensureStripeConfigured();
+  try {
+    ensureStripeConfigured();
 
-  const userId = session.client_reference_id || session.metadata?.user_id;
+    const userId = session.client_reference_id || session.metadata?.user_id;
 
-  if (!userId) {
-    console.error('No user_id in checkout session');
-    return;
-  }
+    if (!userId) {
+      console.error('No user_id in checkout session:', JSON.stringify({
+        client_reference_id: session.client_reference_id,
+        metadata: session.metadata
+      }));
+      return;
+    }
 
-  console.log(`Processing checkout.session.completed for user ${userId}`);
+    console.log(`Processing checkout.session.completed for user ${userId}`);
+    console.log(`Session details: mode=${session.mode}, subscription=${session.subscription}`);
 
-  // For subscription mode, the subscription is created automatically
-  if (session.mode === 'subscription' && session.subscription) {
-    // Retrieve the full subscription object from Stripe
-    const subscription = await stripe.subscriptions.retrieve(session.subscription);
+    // For subscription mode, the subscription is created automatically
+    if (session.mode === 'subscription' && session.subscription) {
+      // Retrieve the full subscription object from Stripe
+      console.log(`Retrieving subscription ${session.subscription} from Stripe...`);
+      const subscription = await stripe.subscriptions.retrieve(session.subscription);
+      console.log(`Subscription retrieved: status=${subscription.status}, current_period_end=${subscription.current_period_end}`);
 
-    const subscriptionEndDate = new Date(subscription.current_period_end * 1000);
-    const priceId = subscription.items.data[0].price.id;
+      const subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+      const priceId = subscription.items.data[0]?.price?.id;
+      console.log(`Calculated end date: ${subscriptionEndDate}, priceId: ${priceId}`);
 
-    // Get plan from database by stripe_price_id
-    const planResult = await query('SELECT plan_id FROM subscription_plans WHERE stripe_price_id = $1', [priceId]);
-    const planId = planResult.rows[0]?.plan_id || 'premium';
+      // Get plan from database by stripe_price_id
+      let planId = 'premium';
+      if (priceId) {
+        const planResult = await query('SELECT plan_id FROM subscription_plans WHERE stripe_price_id = $1', [priceId]);
+        planId = planResult.rows[0]?.plan_id || 'premium';
+        console.log(`Plan lookup: found=${planResult.rows.length > 0}, planId=${planId}`);
+      }
 
-    await query(
-      `UPDATE users SET
-        is_subscribed = true,
-        subscription_plan = $1,
-        subscription_end_date = $2,
-        stripe_subscription_id = $3,
-        subscription_started_at = NOW(),
-        updated_at = NOW()
-      WHERE id = $4`,
-      [planId, subscriptionEndDate, subscription.id, userId]
-    );
+      console.log(`Updating user ${userId} with subscription...`);
+      const updateResult = await query(
+        `UPDATE users SET
+          is_subscribed = true,
+          subscription_plan = $1,
+          subscription_end_date = $2,
+          stripe_subscription_id = $3,
+          subscription_started_at = NOW(),
+          updated_at = NOW()
+        WHERE id = $4
+        RETURNING id, email, is_subscribed`,
+        [planId, subscriptionEndDate, subscription.id, userId]
+      );
 
-    console.log(`Subscription activated for user ${userId}, plan: ${planId}, ends: ${subscriptionEndDate}`);
-  } else {
-    // For one-time payments (if we ever support them)
-    console.log(`Non-subscription checkout completed for user ${userId}`);
+      if (updateResult.rows.length === 0) {
+        console.error(`User ${userId} not found in database - subscription update failed!`);
+        return;
+      }
+
+      console.log(`Subscription activated for user ${userId} (${updateResult.rows[0].email}), plan: ${planId}, ends: ${subscriptionEndDate}`);
+    } else {
+      // For one-time payments (if we ever support them)
+      console.log(`Non-subscription checkout completed for user ${userId}`);
+    }
+  } catch (error) {
+    console.error('Error in handleCheckoutSessionCompleted:', error.message);
+    console.error('Stack trace:', error.stack);
+    throw error; // Re-throw so webhook handler knows it failed
   }
 }
 
