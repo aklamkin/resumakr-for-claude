@@ -202,41 +202,60 @@ export async function handleCheckoutSessionCompleted(session) {
     if (session.mode === 'subscription' && session.subscription) {
       // Retrieve the full subscription object from Stripe
       console.log(`Retrieving subscription ${session.subscription} from Stripe...`);
-      const subscription = await stripe.subscriptions.retrieve(session.subscription);
-      console.log(`Subscription retrieved: status=${subscription.status}, current_period_end=${subscription.current_period_end}`);
+      let subscription;
+      try {
+        subscription = await stripe.subscriptions.retrieve(session.subscription);
+        console.log(`Subscription retrieved: status=${subscription.status}, current_period_end=${subscription.current_period_end}`);
+      } catch (stripeError) {
+        console.error(`Failed to retrieve subscription from Stripe: ${stripeError.message}`);
+        throw stripeError;
+      }
 
       const subscriptionEndDate = new Date(subscription.current_period_end * 1000);
       const priceId = subscription.items.data[0]?.price?.id;
-      console.log(`Calculated end date: ${subscriptionEndDate}, priceId: ${priceId}`);
+      console.log(`Calculated end date: ${subscriptionEndDate.toISOString()}, priceId: ${priceId}`);
 
       // Get plan from database by stripe_price_id
       let planId = 'premium';
       if (priceId) {
-        const planResult = await query('SELECT plan_id FROM subscription_plans WHERE stripe_price_id = $1', [priceId]);
-        planId = planResult.rows[0]?.plan_id || 'premium';
-        console.log(`Plan lookup: found=${planResult.rows.length > 0}, planId=${planId}`);
+        try {
+          const planResult = await query('SELECT plan_id FROM subscription_plans WHERE stripe_price_id = $1', [priceId]);
+          planId = planResult.rows[0]?.plan_id || 'premium';
+          console.log(`Plan lookup: found=${planResult.rows.length > 0}, planId=${planId}`);
+        } catch (dbError) {
+          console.error(`Plan lookup failed: ${dbError.message}`);
+          // Continue with default planId
+        }
       }
 
-      console.log(`Updating user ${userId} with subscription...`);
-      const updateResult = await query(
-        `UPDATE users SET
-          is_subscribed = true,
-          subscription_plan = $1,
-          subscription_end_date = $2,
-          stripe_subscription_id = $3,
-          subscription_started_at = NOW(),
-          updated_at = NOW()
-        WHERE id = $4
-        RETURNING id, email, is_subscribed`,
-        [planId, subscriptionEndDate, subscription.id, userId]
-      );
+      console.log(`Updating user ${userId} with: planId=${planId}, endDate=${subscriptionEndDate.toISOString()}, subId=${subscription.id}`);
+      let updateResult;
+      try {
+        updateResult = await query(
+          `UPDATE users SET
+            is_subscribed = true,
+            subscription_plan = $1,
+            subscription_end_date = $2,
+            stripe_subscription_id = $3,
+            subscription_started_at = NOW(),
+            updated_at = NOW()
+          WHERE id = $4
+          RETURNING id, email, is_subscribed`,
+          [planId, subscriptionEndDate, subscription.id, userId]
+        );
+        console.log(`UPDATE query completed, rows affected: ${updateResult.rows.length}`);
+      } catch (dbError) {
+        console.error(`Database UPDATE failed: ${dbError.message}`);
+        console.error(`DB Error details: ${JSON.stringify(dbError)}`);
+        throw dbError;
+      }
 
       if (updateResult.rows.length === 0) {
         console.error(`User ${userId} not found in database - subscription update failed!`);
         return;
       }
 
-      console.log(`Subscription activated for user ${userId} (${updateResult.rows[0].email}), plan: ${planId}, ends: ${subscriptionEndDate}`);
+      console.log(`SUCCESS: Subscription activated for user ${userId} (${updateResult.rows[0].email}), plan: ${planId}, ends: ${subscriptionEndDate.toISOString()}`);
     } else {
       // For one-time payments (if we ever support them)
       console.log(`Non-subscription checkout completed for user ${userId}`);
@@ -258,6 +277,13 @@ export async function handleSubscriptionCreated(subscription) {
 
   if (!userId) {
     console.log('No user_id in subscription metadata, skipping (checkout.session.completed handles this)');
+    return;
+  }
+
+  // Check if user is already subscribed (checkout.session.completed may have already processed)
+  const existingUser = await query('SELECT is_subscribed, stripe_subscription_id FROM users WHERE id = $1', [userId]);
+  if (existingUser.rows[0]?.is_subscribed && existingUser.rows[0]?.stripe_subscription_id) {
+    console.log(`User ${userId} already has active subscription, skipping duplicate update`);
     return;
   }
 
