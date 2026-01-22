@@ -211,8 +211,21 @@ export async function handleCheckoutSessionCompleted(session) {
         throw stripeError;
       }
 
+      // Validate current_period_end before using it
+      if (!subscription.current_period_end || typeof subscription.current_period_end !== 'number') {
+        console.error(`Invalid current_period_end: ${subscription.current_period_end} (type: ${typeof subscription.current_period_end})`);
+        throw new Error('Subscription has invalid current_period_end');
+      }
+
       const subscriptionEndDate = new Date(subscription.current_period_end * 1000);
-      const priceId = subscription.items.data[0]?.price?.id;
+
+      // Validate the date is valid
+      if (isNaN(subscriptionEndDate.getTime())) {
+        console.error(`Invalid date calculated from current_period_end: ${subscription.current_period_end}`);
+        throw new Error('Invalid subscription end date calculated');
+      }
+
+      const priceId = subscription.items?.data?.[0]?.price?.id;
       console.log(`Calculated end date: ${subscriptionEndDate.toISOString()}, priceId: ${priceId}`);
 
       // Get plan from database by stripe_price_id
