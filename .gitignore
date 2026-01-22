@@ -66,3 +66,5 @@ temp/
 # Package manager
 package-lock.json.backup
 yarn.lock.backup
+backend/node_modules/
+frontend/node_modules/
