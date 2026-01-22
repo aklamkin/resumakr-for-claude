@@ -226,21 +226,45 @@ export async function handleCheckoutSessionCompleted(session) {
 
 /**
  * Handle subscription created webhook
+ * Note: checkout.session.completed is the primary handler for Stripe Checkout.
+ * This handler is a backup for subscriptions created through other means.
  */
 export async function handleSubscriptionCreated(subscription) {
-  const userId = subscription.metadata.user_id;
+  const userId = subscription.metadata?.user_id;
 
   if (!userId) {
-    console.error('No user_id in subscription metadata');
+    console.log('No user_id in subscription metadata, skipping (checkout.session.completed handles this)');
     return;
   }
 
+  // Validate current_period_end exists - retrieve full subscription if missing
+  if (!subscription.current_period_end || typeof subscription.current_period_end !== 'number') {
+    console.log('Invalid current_period_end in subscription, retrieving full subscription from Stripe');
+    try {
+      ensureStripeConfigured();
+      subscription = await stripe.subscriptions.retrieve(subscription.id);
+    } catch (error) {
+      console.error('Failed to retrieve subscription from Stripe:', error.message);
+      return;
+    }
+  }
+
   const subscriptionEndDate = new Date(subscription.current_period_end * 1000);
-  const priceId = subscription.items.data[0].price.id;
+
+  // Validate the date is valid before database update
+  if (isNaN(subscriptionEndDate.getTime())) {
+    console.error('Invalid subscription end date calculated, skipping update');
+    return;
+  }
+
+  const priceId = subscription.items?.data?.[0]?.price?.id;
 
   // Get plan from database by stripe_price_id
-  const planResult = await query('SELECT plan_id FROM subscription_plans WHERE stripe_price_id = $1', [priceId]);
-  const planId = planResult.rows[0]?.plan_id || 'premium';
+  let planId = 'premium';
+  if (priceId) {
+    const planResult = await query('SELECT plan_id FROM subscription_plans WHERE stripe_price_id = $1', [priceId]);
+    planId = planResult.rows[0]?.plan_id || 'premium';
+  }
 
   await query(
     `UPDATE users SET
