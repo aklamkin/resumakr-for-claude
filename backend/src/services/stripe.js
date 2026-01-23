@@ -224,13 +224,21 @@ export async function handleCheckoutSessionCompleted(session) {
         throw stripeError;
       }
 
+      // Get current_period_end - it may be on subscription root or on subscription item
+      // Stripe API behavior varies - check both locations
+      let currentPeriodEnd = subscription.current_period_end;
+      if (!currentPeriodEnd && subscription.items?.data?.[0]?.current_period_end) {
+        currentPeriodEnd = subscription.items.data[0].current_period_end;
+        console.log(`Using current_period_end from subscription item: ${currentPeriodEnd}`);
+      }
+
       // Validate current_period_end before using it
-      if (!subscription.current_period_end || typeof subscription.current_period_end !== 'number') {
-        console.error(`Invalid current_period_end: ${subscription.current_period_end} (type: ${typeof subscription.current_period_end})`);
+      if (!currentPeriodEnd || typeof currentPeriodEnd !== 'number') {
+        console.error(`Invalid current_period_end: ${currentPeriodEnd} (type: ${typeof currentPeriodEnd})`);
         throw new Error('Subscription has invalid current_period_end');
       }
 
-      const subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+      const subscriptionEndDate = new Date(currentPeriodEnd * 1000);
 
       // Validate the date is valid
       if (isNaN(subscriptionEndDate.getTime())) {
@@ -318,14 +326,30 @@ export async function handleSubscriptionCreated(subscription) {
     console.log('Invalid current_period_end in subscription, retrieving full subscription from Stripe');
     try {
       ensureStripeConfigured();
-      subscription = await stripe.subscriptions.retrieve(subscription.id);
+      subscription = await stripe.subscriptions.retrieve(subscription.id, {
+        expand: ['items.data.price']
+      });
     } catch (error) {
       console.error('Failed to retrieve subscription from Stripe:', error.message);
       return;
     }
   }
 
-  const subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+  // Get current_period_end - it may be on subscription root or on subscription item
+  // Stripe API behavior varies - check both locations
+  let currentPeriodEnd = subscription.current_period_end;
+  if (!currentPeriodEnd && subscription.items?.data?.[0]?.current_period_end) {
+    currentPeriodEnd = subscription.items.data[0].current_period_end;
+    console.log(`Using current_period_end from subscription item: ${currentPeriodEnd}`);
+  }
+
+  // Final validation
+  if (!currentPeriodEnd || typeof currentPeriodEnd !== 'number') {
+    console.error(`Invalid current_period_end after all attempts: ${currentPeriodEnd}`);
+    return;
+  }
+
+  const subscriptionEndDate = new Date(currentPeriodEnd * 1000);
 
   // Validate the date is valid before database update
   if (isNaN(subscriptionEndDate.getTime())) {
@@ -361,14 +385,25 @@ export async function handleSubscriptionCreated(subscription) {
  * Handle subscription updated webhook
  */
 export async function handleSubscriptionUpdated(subscription) {
-  const userId = subscription.metadata.user_id;
+  const userId = subscription.metadata?.user_id;
 
   if (!userId) {
-    console.error('No user_id in subscription metadata');
+    console.log('No user_id in subscription metadata, skipping');
     return;
   }
 
-  const subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+  // Get current_period_end - check both root and item locations
+  let currentPeriodEnd = subscription.current_period_end;
+  if (!currentPeriodEnd && subscription.items?.data?.[0]?.current_period_end) {
+    currentPeriodEnd = subscription.items.data[0].current_period_end;
+  }
+
+  if (!currentPeriodEnd || typeof currentPeriodEnd !== 'number') {
+    console.error(`Invalid current_period_end in subscription update: ${currentPeriodEnd}`);
+    return;
+  }
+
+  const subscriptionEndDate = new Date(currentPeriodEnd * 1000);
   const isActive = subscription.status === 'active';
 
   await query(
