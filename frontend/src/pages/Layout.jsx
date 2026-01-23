@@ -1,10 +1,10 @@
 import React from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import {
-  FileCheck, Home, Settings as SettingsIcon, User,
-  HelpCircle, DollarSign, Brain, FileText, Ticket, Tag,
-  ChevronDown, ChevronRight, Monitor, Users
+  FileCheck, Settings as SettingsIcon, User,
+  HelpCircle, DollarSign, Brain, FileText, Ticket,
+  ChevronDown, ChevronRight, Monitor, Users, Plus, CreditCard
 } from "lucide-react";
 import {
   Sidebar,
@@ -23,11 +23,6 @@ import api from "@/api/apiClient";
 
 const navigationItems = [
   {
-    title: "Home",
-    url: createPageUrl("Home"),
-    icon: Home,
-  },
-  {
     title: "My Resumes",
     url: createPageUrl("MyResumes"),
     icon: FileCheck,
@@ -37,12 +32,7 @@ const navigationItems = [
     title: "Pricing",
     url: createPageUrl("Pricing"),
     icon: DollarSign,
-  },
-  {
-    title: "Account",
-    url: createPageUrl("AccountSettings"),
-    icon: User,
-    requiresAuth: true,
+    // Will show "My Plan" for subscribers (handled in render)
   },
   {
     title: "Help",
@@ -205,9 +195,12 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
       `}</style>
 
       <Sidebar collapsible="none" className="border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex flex-col">
-        {/* Header */}
+        {/* Header - Clickable logo area */}
         <SidebarHeader className="border-b border-border/50 bg-muted/30 px-4 py-4 flex-shrink-0">
-          <div className="flex items-center gap-3">
+          <Link
+            to={user ? createPageUrl("MyResumes") : "/"}
+            className="flex items-center gap-3 rounded-lg transition-all hover:opacity-80 cursor-pointer"
+          >
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 shadow-md flex-shrink-0">
               <FileCheck className="h-5 w-5 text-white" />
             </div>
@@ -215,17 +208,40 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
               <h1 className="text-lg font-bold tracking-tight">Resumakr</h1>
               <p className="text-xs text-muted-foreground">Build Your Future</p>
             </div>
-          </div>
+          </Link>
         </SidebarHeader>
 
         {/* Navigation */}
         <SidebarContent className="sidebar-scroll px-3 py-4 flex-1 overflow-y-auto">
+          {/* New Resume Button - Only for authenticated users */}
+          {user && (
+            <div className="mb-4">
+              <Link
+                to={createPageUrl("BuildWizard")}
+                className={cn(
+                  "flex items-center justify-center gap-2 w-full h-10 px-4 rounded-lg",
+                  "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700",
+                  "text-white font-medium text-sm shadow-md hover:shadow-lg",
+                  "transition-all duration-200"
+                )}
+              >
+                <Plus className="h-4 w-4" />
+                <span>New Resume</span>
+              </Link>
+            </div>
+          )}
+
           {/* Main Navigation */}
           <SidebarGroup className="px-0">
             <SidebarGroupContent>
               <SidebarMenu className="space-y-1">
                 {visibleNavItems.map((item) => {
                   const isActive = location.pathname === item.url;
+                  // Show "My Plan" instead of "Pricing" for subscribed users
+                  const isSubscribed = user?.is_subscribed && user?.subscription_end_date && new Date(user.subscription_end_date) > new Date();
+                  const displayTitle = item.title === "Pricing" && isSubscribed ? "My Plan" : item.title;
+                  const DisplayIcon = item.title === "Pricing" && isSubscribed ? CreditCard : item.icon;
+
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
@@ -239,8 +255,8 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                         data-active={isActive}
                       >
                         <Link to={item.url} className="flex items-center">
-                          <item.icon className="h-4 w-4 flex-shrink-0" />
-                          <span>{item.title}</span>
+                          <DisplayIcon className="h-4 w-4 flex-shrink-0" />
+                          <span>{displayTitle}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -308,18 +324,22 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
           )}
         </SidebarContent>
 
-        {/* Footer - User Email */}
+        {/* Footer - Clickable User Area (goes to Account) */}
         {user && (
-          <SidebarFooter className="border-t border-border/50 bg-muted/30 px-4 py-3 flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex-shrink-0">
+          <SidebarFooter className="border-t border-border/50 bg-muted/30 px-2 py-2 flex-shrink-0">
+            <Link
+              to={createPageUrl("AccountSettings")}
+              className="flex items-center gap-3 px-2 py-2 rounded-lg transition-all hover:bg-muted/70 cursor-pointer group"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex-shrink-0 group-hover:scale-105 transition-transform">
                 <User className="h-4 w-4 text-white" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium truncate">{user.full_name || 'User'}</p>
                 <p className="text-xs text-muted-foreground truncate">{user.email}</p>
               </div>
-            </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+            </Link>
           </SidebarFooter>
         )}
       </Sidebar>

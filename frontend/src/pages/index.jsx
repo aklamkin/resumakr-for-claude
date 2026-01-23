@@ -1,5 +1,6 @@
 import Layout from "./Layout.jsx";
 
+import Landing from "./Landing";
 import Home from "./Home";
 import Login from "./Login";
 import Signup from "./Signup";
@@ -67,10 +68,11 @@ function PagesContent() {
     const currentPage = _getCurrentPage(location.pathname);
     const isPublicPage = PUBLIC_PAGES.includes(currentPage) || location.pathname === '/login' || location.pathname === '/signup';
     
-    // Auth pages don't use Layout
-    if (location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/auth/callback' || location.pathname === '/forgot-password' || location.pathname === '/reset-password') {
+    // Landing page and auth pages don't use Layout (they have their own navigation)
+    if (location.pathname === '/' || location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/auth/callback' || location.pathname === '/forgot-password' || location.pathname === '/reset-password') {
         return (
             <Routes>
+                <Route path="/" element={<Landing />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
@@ -82,8 +84,7 @@ function PagesContent() {
     
     return (
         <Layout currentPageName={currentPage} isPublicPage={isPublicPage}>
-            <Routes>            
-                <Route path="/" element={<Home />} />
+            <Routes>
                 <Route path="/Home" element={<Home />} />
                 <Route path="/UploadResume" element={<UploadResume />} />
                 <Route path="/BuildWizard" element={<BuildWizard />} />
