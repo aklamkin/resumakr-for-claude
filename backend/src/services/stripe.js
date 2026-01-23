@@ -211,8 +211,14 @@ export async function handleCheckoutSessionCompleted(session) {
       console.log(`Retrieving subscription ${session.subscription} from Stripe...`);
       let subscription;
       try {
-        subscription = await stripe.subscriptions.retrieve(session.subscription);
-        console.log(`Subscription retrieved: status=${subscription.status}, current_period_end=${subscription.current_period_end}`);
+        const rawSubscription = await stripe.subscriptions.retrieve(session.subscription, {
+          expand: ['items.data.price']
+        });
+        console.log(`RAW subscription response type: ${typeof rawSubscription}`);
+        console.log(`RAW subscription JSON: ${JSON.stringify(rawSubscription, null, 2).substring(0, 2000)}`);
+        subscription = rawSubscription;
+        console.log(`Subscription retrieved: status=${subscription.status}, current_period_end=${subscription.current_period_end}, id=${subscription.id}`);
+        console.log(`Full subscription object keys: ${Object.keys(subscription).join(', ')}`);
       } catch (stripeError) {
         console.error(`Failed to retrieve subscription from Stripe: ${stripeError.message}`);
         throw stripeError;
