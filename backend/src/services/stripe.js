@@ -15,6 +15,33 @@ function ensureStripeConfigured() {
 }
 
 /**
+ * Calculate subscription end date based on plan period and duration.
+ * Monthly plans use calendar month increments (Jan 23 -> Feb 23),
+ * not fixed day counts, to keep billing dates consistent.
+ */
+function calculateSubscriptionEndDate(period, duration) {
+  const endDate = new Date();
+
+  switch (period) {
+    case 'month':
+      endDate.setMonth(endDate.getMonth() + duration);
+      break;
+    case 'year':
+      endDate.setFullYear(endDate.getFullYear() + duration);
+      break;
+    case 'week':
+      endDate.setDate(endDate.getDate() + (duration * 7));
+      break;
+    case 'day':
+    default:
+      endDate.setDate(endDate.getDate() + duration);
+      break;
+  }
+
+  return endDate;
+}
+
+/**
  * Get or create a Stripe customer for a user
  */
 export async function getOrCreateCustomer(userId, email, fullName) {
@@ -249,33 +276,33 @@ export async function handleCheckoutSessionCompleted(session) {
       const priceId = subscription.items?.data?.[0]?.price?.id;
       console.log(`Stripe current_period_end: ${subscriptionEndDate.toISOString()}, priceId: ${priceId}`);
 
-      // Get plan from database by stripe_price_id - including duration for accurate end date
+      // Get plan from database by stripe_price_id - including period and duration for accurate end date
       let planId = 'premium';
       let planDuration = null;
+      let planPeriod = null;
       if (priceId) {
         try {
-          const planResult = await query('SELECT plan_id, duration FROM subscription_plans WHERE stripe_price_id = $1', [priceId]);
+          const planResult = await query('SELECT plan_id, duration, period FROM subscription_plans WHERE stripe_price_id = $1', [priceId]);
           if (planResult.rows.length > 0) {
             planId = planResult.rows[0].plan_id || 'premium';
             planDuration = planResult.rows[0].duration;
+            planPeriod = planResult.rows[0].period;
           }
-          console.log(`Plan lookup: found=${planResult.rows.length > 0}, planId=${planId}, duration=${planDuration}`);
+          console.log(`Plan lookup: found=${planResult.rows.length > 0}, planId=${planId}, duration=${planDuration}, period=${planPeriod}`);
         } catch (dbError) {
           console.error(`Plan lookup failed: ${dbError.message}`);
           // Continue with default planId
         }
       }
 
-      // Calculate subscription end date based on plan duration (not Stripe's billing period)
-      // This ensures "Daily" plan = 1 day, "Weekly" = 7 days, etc.
+      // Calculate subscription end date based on plan period and duration
+      // Monthly plans use calendar month increments (Jan 23 -> Feb 23) to keep billing date consistent
       let finalEndDate = subscriptionEndDate;
-      if (planDuration && typeof planDuration === 'number') {
-        const calculatedEndDate = new Date();
-        calculatedEndDate.setDate(calculatedEndDate.getDate() + planDuration);
-        finalEndDate = calculatedEndDate;
-        console.log(`Using plan duration (${planDuration} days) for end date: ${finalEndDate.toISOString()}`);
+      if (planDuration && typeof planDuration === 'number' && planPeriod) {
+        finalEndDate = calculateSubscriptionEndDate(planPeriod, planDuration);
+        console.log(`Using plan period=${planPeriod}, duration=${planDuration} for end date: ${finalEndDate.toISOString()}`);
       } else {
-        console.log(`No plan duration found, using Stripe current_period_end: ${finalEndDate.toISOString()}`);
+        console.log(`No plan period/duration found, using Stripe current_period_end: ${finalEndDate.toISOString()}`);
       }
 
       console.log(`Updating user ${userId} with: planId=${planId}, endDate=${finalEndDate.toISOString()}, subId=${subscription.id}`);
@@ -375,24 +402,25 @@ export async function handleSubscriptionCreated(subscription) {
 
   const priceId = subscription.items?.data?.[0]?.price?.id;
 
-  // Get plan from database by stripe_price_id - including duration for accurate end date
+  // Get plan from database by stripe_price_id - including period and duration for accurate end date
   let planId = 'premium';
   let planDuration = null;
+  let planPeriod = null;
   if (priceId) {
-    const planResult = await query('SELECT plan_id, duration FROM subscription_plans WHERE stripe_price_id = $1', [priceId]);
+    const planResult = await query('SELECT plan_id, duration, period FROM subscription_plans WHERE stripe_price_id = $1', [priceId]);
     if (planResult.rows.length > 0) {
       planId = planResult.rows[0].plan_id || 'premium';
       planDuration = planResult.rows[0].duration;
+      planPeriod = planResult.rows[0].period;
     }
   }
 
-  // Calculate subscription end date based on plan duration (not Stripe's billing period)
+  // Calculate subscription end date based on plan period and duration
+  // Monthly plans use calendar month increments to keep billing date consistent
   let finalEndDate = subscriptionEndDate;
-  if (planDuration && typeof planDuration === 'number') {
-    const calculatedEndDate = new Date();
-    calculatedEndDate.setDate(calculatedEndDate.getDate() + planDuration);
-    finalEndDate = calculatedEndDate;
-    console.log(`Using plan duration (${planDuration} days) for end date: ${finalEndDate.toISOString()}`);
+  if (planDuration && typeof planDuration === 'number' && planPeriod) {
+    finalEndDate = calculateSubscriptionEndDate(planPeriod, planDuration);
+    console.log(`Using plan period=${planPeriod}, duration=${planDuration} for end date: ${finalEndDate.toISOString()}`);
   }
 
   await query(
@@ -435,22 +463,21 @@ export async function handleSubscriptionUpdated(subscription) {
   const subscriptionEndDate = new Date(currentPeriodEnd * 1000);
   const isActive = subscription.status === 'active';
 
-  // Get plan duration to calculate accurate end date
+  // Get plan period and duration to calculate accurate end date
   const priceId = subscription.items?.data?.[0]?.price?.id;
   let finalEndDate = subscriptionEndDate;
 
   if (priceId) {
     try {
-      const planResult = await query('SELECT duration FROM subscription_plans WHERE stripe_price_id = $1', [priceId]);
-      if (planResult.rows.length > 0 && planResult.rows[0].duration) {
+      const planResult = await query('SELECT duration, period FROM subscription_plans WHERE stripe_price_id = $1', [priceId]);
+      if (planResult.rows.length > 0 && planResult.rows[0].duration && planResult.rows[0].period) {
         const planDuration = planResult.rows[0].duration;
-        const calculatedEndDate = new Date();
-        calculatedEndDate.setDate(calculatedEndDate.getDate() + planDuration);
-        finalEndDate = calculatedEndDate;
-        console.log(`Subscription updated: using plan duration (${planDuration} days) for end date: ${finalEndDate.toISOString()}`);
+        const planPeriod = planResult.rows[0].period;
+        finalEndDate = calculateSubscriptionEndDate(planPeriod, planDuration);
+        console.log(`Subscription updated: using period=${planPeriod}, duration=${planDuration} for end date: ${finalEndDate.toISOString()}`);
       }
     } catch (err) {
-      console.error(`Failed to lookup plan duration: ${err.message}`);
+      console.error(`Failed to lookup plan period/duration: ${err.message}`);
     }
   }
 
@@ -470,10 +497,10 @@ export async function handleSubscriptionUpdated(subscription) {
  * Handle subscription deleted/cancelled webhook
  */
 export async function handleSubscriptionDeleted(subscription) {
-  const userId = subscription.metadata.user_id;
+  const userId = subscription.metadata?.user_id;
 
   if (!userId) {
-    console.error('No user_id in subscription metadata');
+    console.log('No user_id in subscription metadata, skipping');
     return;
   }
 
