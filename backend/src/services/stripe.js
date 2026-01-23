@@ -182,6 +182,13 @@ export function verifyWebhookSignature(payload, signature) {
  * This is the PRIMARY event for Stripe Checkout - fires immediately when payment succeeds
  */
 export async function handleCheckoutSessionCompleted(session) {
+  // IMMEDIATE logging to confirm handler is called
+  console.log('=== handleCheckoutSessionCompleted CALLED ===');
+  console.log('Session ID:', session.id);
+  console.log('client_reference_id:', session.client_reference_id);
+  console.log('mode:', session.mode);
+  console.log('subscription:', session.subscription);
+
   try {
     ensureStripeConfigured();
 

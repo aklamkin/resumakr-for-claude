@@ -46,20 +46,21 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
     console.log(`Event ${event.id} stored in database, processing...`);
 
     // Handle different event types
+    console.log('=== PROCESSING EVENT TYPE:', event.type, '===');
     switch (event.type) {
       case 'checkout.session.completed':
         // This is the primary event for successful Stripe Checkout payments
-        // Log full session object for debugging
-        console.log('checkout.session.completed - Full session object:', JSON.stringify({
-          id: event.data.object.id,
-          mode: event.data.object.mode,
-          subscription: event.data.object.subscription,
-          client_reference_id: event.data.object.client_reference_id,
-          metadata: event.data.object.metadata,
-          customer: event.data.object.customer,
-          payment_status: event.data.object.payment_status
-        }, null, 2));
-        await stripeService.handleCheckoutSessionCompleted(event.data.object);
+        console.log('>>> ENTERING checkout.session.completed case');
+        console.log('>>> client_reference_id:', event.data.object.client_reference_id);
+        console.log('>>> subscription:', event.data.object.subscription);
+        try {
+          await stripeService.handleCheckoutSessionCompleted(event.data.object);
+          console.log('>>> handleCheckoutSessionCompleted completed successfully');
+        } catch (handlerError) {
+          console.error('>>> handleCheckoutSessionCompleted FAILED:', handlerError.message);
+          console.error('>>> Stack:', handlerError.stack);
+          throw handlerError;
+        }
         break;
 
       case 'customer.subscription.created':

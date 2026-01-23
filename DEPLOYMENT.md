@@ -187,6 +187,42 @@ databases:
 
 ---
 
+## Option 4: Railway Full-Stack (Backend + Frontend on Railway)
+
+Deploy both frontend and backend to Railway for simpler single-platform management.
+
+### Architecture
+
+```
+Railway Platform
+├── Backend Service (Express API)
+├── Frontend Service (Static Vite build via serve)
+└── PostgreSQL Database
+```
+
+### Steps
+
+1. **Create Railway Project** and add PostgreSQL database
+2. **Configure Backend Service:**
+   - Root Directory: `backend`
+   - Railway auto-detects Node.js
+   - Add environment variables (same as Option 1)
+
+3. **Add Frontend Service:**
+   - Click "+ New" → "GitHub Repo" → Select same repo
+   - Root Directory: `frontend`
+   - Build Command: `npm install && npm run build`
+   - Start Command: `npm install -g serve && serve -s dist -p $PORT`
+   - Add `VITE_API_URL` pointing to backend Railway URL
+
+4. **Generate Domains** for both services in Settings → Networking
+
+5. **Update Backend** with `FRONTEND_URL` pointing to frontend Railway URL
+
+**Cost:** ~$5-10/month total (backend ~$3-5, frontend ~$1-2, PostgreSQL ~$1-3)
+
+---
+
 ## Post-Deployment Checklist
 
 - [ ] Frontend loads without errors
