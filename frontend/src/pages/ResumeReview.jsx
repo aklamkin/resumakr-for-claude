@@ -419,7 +419,10 @@ export default function ResumeReview() {
         professional_summary: resumeData.professional_summary || "",
         work_experience: resumeData.work_experience || [],
         skills: resumeData.skills || [],
-        education: resumeData.education || []
+        education: resumeData.education || [],
+        certifications: resumeData.certifications || [],
+        projects: resumeData.projects || [],
+        languages: resumeData.languages || []
       };
 
       // Use the dedicated ATS analysis endpoint

@@ -161,7 +161,7 @@ BE EXTREMELY THOROUGH. Extract EVERYTHING. Do NOT skip or summarize ANY informat
     name: 'ATS Analysis (Free)',
     description: 'Simplified ATS compatibility analysis for free-tier users. Returns score only.',
     system_prompt: 'You are an expert ATS system analyst.',
-    prompt_text: `Analyze this resume against the job description for ATS compatibility. Provide ONLY a compatibility score.
+    prompt_text: `Analyze this resume against the job description for ATS compatibility.
 
 Job Description:
 {job_description}
@@ -169,8 +169,12 @@ Job Description:
 Resume:
 {resume_text}
 
-Respond with JSON: {"score": <0-100>}
-Only the score, nothing else.`,
+Scoring method:
+1. Extract up to 20 important keywords/phrases from the job description
+2. Check how many of those keywords appear (or have close equivalents) in the resume
+3. Score = percentage of job description keywords found in the resume (0-100)
+
+Respond with ONLY valid JSON: {"score": <0-100>}`,
     temperature: 0.3,
     max_tokens: 200,
     available_variables: [

@@ -375,7 +375,62 @@ router.post('/analyze-ats', checkAiCredits, async (req, res) => {
     }
 
     const isFreeUser = req.user.effectiveTier === 'free';
-    const resumeText = `Professional Summary: ${resume_data.professional_summary || ''}\n\nWork Experience:\n${resume_data.work_experience?.map(job => `${job.position} at ${job.company}\n${job.responsibilities?.join('\n')}`).join('\n') || ''}\n\nSkills: ${resume_data.skills?.flatMap(s => s.items).join(', ') || ''}`.trim();
+
+    // Build comprehensive resume text including ALL sections for accurate keyword matching
+    const sections = [];
+
+    if (resume_data.personal_info) {
+      const pi = resume_data.personal_info;
+      const parts = [pi.name, pi.title, pi.location, pi.email, pi.phone, pi.linkedin, pi.website].filter(Boolean);
+      if (parts.length) sections.push(parts.join(' | '));
+    }
+
+    if (resume_data.professional_summary) {
+      sections.push(`Professional Summary:\n${resume_data.professional_summary}`);
+    }
+
+    if (resume_data.work_experience?.length) {
+      const jobs = resume_data.work_experience.map(job => {
+        const lines = [`${job.position || ''} at ${job.company || ''}${job.dates ? ` (${job.dates})` : ''}`];
+        if (job.responsibilities?.length) lines.push(...job.responsibilities);
+        if (job.achievements?.length) lines.push(...job.achievements);
+        return lines.join('\n');
+      });
+      sections.push(`Work Experience:\n${jobs.join('\n\n')}`);
+    }
+
+    if (resume_data.education?.length) {
+      const edu = resume_data.education.map(e => {
+        const parts = [e.degree, e.field_of_study, e.institution, e.dates || e.graduation_date].filter(Boolean);
+        return parts.join(', ');
+      });
+      sections.push(`Education:\n${edu.join('\n')}`);
+    }
+
+    if (resume_data.skills?.length) {
+      const skills = resume_data.skills.flatMap(s => s.items || []);
+      if (skills.length) sections.push(`Skills: ${skills.join(', ')}`);
+    }
+
+    if (resume_data.certifications?.length) {
+      const certs = resume_data.certifications.map(c => [c.name, c.issuer, c.date].filter(Boolean).join(', '));
+      sections.push(`Certifications:\n${certs.join('\n')}`);
+    }
+
+    if (resume_data.projects?.length) {
+      const proj = resume_data.projects.map(p => {
+        const parts = [p.name, p.description, p.technologies?.join(', ')].filter(Boolean);
+        return parts.join(' - ');
+      });
+      sections.push(`Projects:\n${proj.join('\n')}`);
+    }
+
+    if (resume_data.languages?.length) {
+      const langs = resume_data.languages.map(l => [l.language, l.proficiency].filter(Boolean).join(': '));
+      sections.push(`Languages: ${langs.join(', ')}`);
+    }
+
+    const resumeText = sections.join('\n\n').trim();
 
     const promptType = isFreeUser ? 'ats_analysis_free' : 'ats_analysis_paid';
     const promptData = await buildPrompt(promptType, {
