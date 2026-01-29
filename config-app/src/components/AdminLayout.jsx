@@ -4,7 +4,7 @@ import { useAdminAuth } from './AdminAuthGuard';
 import {
   Monitor, Users, Brain, FileText, CreditCard,
   Ticket, HelpCircle, Shield, LogOut,
-  ChevronLeft, ChevronRight, Zap, FileCheck
+  ChevronLeft, Zap, FileCheck
 } from 'lucide-react';
 
 const navItems = [
@@ -36,23 +36,32 @@ export default function AdminLayout({ children }) {
       <aside className={`${collapsed ? 'w-16' : 'w-64'} bg-card border-r flex flex-col transition-all duration-200`}>
         {/* Header - Branding */}
         <div className="px-3 py-3 border-b flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 shadow-md flex-shrink-0">
+          {collapsed ? (
+            <button
+              onClick={() => setCollapsed(false)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 shadow-md flex-shrink-0 hover:opacity-80 transition-all mx-auto"
+            >
               <FileCheck className="h-5 w-5 text-white" />
-            </div>
-            {!collapsed && (
-              <div className="min-w-0">
-                <h1 className="text-lg font-bold tracking-tight">Resumakr</h1>
-                <p className="text-xs text-muted-foreground">Admin Panel</p>
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 shadow-md flex-shrink-0">
+                  <FileCheck className="h-5 w-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-lg font-bold tracking-tight">Resumakr</h1>
+                  <p className="text-xs text-muted-foreground">Admin Panel</p>
+                </div>
               </div>
-            )}
-          </div>
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground flex-shrink-0"
-          >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </button>
+              <button
+                onClick={() => setCollapsed(true)}
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground flex-shrink-0"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            </>
+          )}
         </div>
 
         {/* Navigation */}
