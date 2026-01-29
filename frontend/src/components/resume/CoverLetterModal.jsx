@@ -555,7 +555,21 @@ export default function CoverLetterModal({
                 </div>
               ) : (
                 <>
-                  <div className="flex items-start justify-center min-h-full">
+                  <div className="flex flex-col items-center min-h-full w-full">
+                    <div className="w-full flex justify-end mb-2" style={{ maxWidth: '850px' }}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditedContent(getCurrentContent());
+                          setEditMode(true);
+                        }}
+                        className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 shadow-lg text-slate-700 dark:text-slate-200"
+                      >
+                        <Edit2 className="w-3.5 h-3.5 mr-1.5" />
+                        Edit Content
+                      </Button>
+                    </div>
                     <AnimatePresence mode="wait">
                       <motion.div
                         key={`${currentTemplate.id}-${activeVersion}`}
@@ -563,22 +577,10 @@ export default function CoverLetterModal({
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                         transition={{ duration: 0.2 }}
-                        className="w-full relative"
+                        className="w-full"
                         style={{ maxWidth: '850px' }}
                       >
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditedContent(getCurrentContent());
-                            setEditMode(true);
-                          }}
-                          className="absolute top-3 right-3 z-20 bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 shadow-md text-slate-700 dark:text-slate-200 backdrop-blur-sm"
-                        >
-                          <Edit2 className="w-3.5 h-3.5 mr-1.5" />
-                          Edit Content
-                        </Button>
-                        <CoverLetterTemplate 
+                        <CoverLetterTemplate
                           personalInfo={resumeData?.personal_info || {}}
                           content={getCurrentContent()}
                           template={currentTemplate.id}
@@ -638,13 +640,6 @@ export default function CoverLetterModal({
                       {template.name}
                     </button>
                   ))}
-                </div>
-
-                <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg p-3 mb-6">
-                  <p className="text-xs text-blue-200 leading-relaxed">
-                    <strong className="text-blue-100">Note:</strong> Cover letter generated from your resume and job description. 
-                    No information is fabricated.
-                  </p>
                 </div>
 
                 {/* Color Customization */}

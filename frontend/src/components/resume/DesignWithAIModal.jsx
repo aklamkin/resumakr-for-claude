@@ -117,8 +117,8 @@ export default function DesignWithAIModal({
         <DialogHeader className="p-6 pb-4 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center justify-between pr-8">
             <div>
-              <DialogTitle className="text-2xl font-bold dark:text-slate-100">Design With AI</DialogTitle>
-              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Choose a template for your resume</p>
+              <DialogTitle className="text-2xl font-bold dark:text-slate-100">Choose a Template</DialogTitle>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Preview and customize your resume's look and feel</p>
             </div>
           </div>
         </DialogHeader>
