@@ -1,5 +1,36 @@
 // Utility functions for consistent date formatting with timezone awareness
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * Format a resume date (YYYY-MM or YYYY format) for display.
+ * Uses pure string parsing to avoid timezone bugs with Date objects.
+ * This is the SINGLE SOURCE OF TRUTH for resume date formatting.
+ *
+ * @param {string} dateString - Date in YYYY-MM, YYYY, or other format
+ * @returns {string} Formatted date like "Jan 2022", "2020", or the original string
+ */
+export function formatResumeDate(dateString) {
+  if (!dateString) return '';
+
+  // Year-only format (e.g., "2020")
+  if (/^\d{4}$/.test(dateString)) {
+    return dateString;
+  }
+
+  // YYYY-MM format (e.g., "2022-01")
+  const match = dateString.match(/^(\d{4})-(\d{2})$/);
+  if (match) {
+    const monthIndex = parseInt(match[2], 10) - 1;
+    if (monthIndex >= 0 && monthIndex < 12) {
+      return `${MONTH_NAMES[monthIndex]} ${match[1]}`;
+    }
+  }
+
+  // Return as-is for any other format (e.g., "January 2020", freeform text)
+  return dateString;
+}
+
 /**
  * Format a date string to a localized date string (user's timezone)
  * @param {string|Date} dateString - The date to format

@@ -1,19 +1,9 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { format } from "date-fns";
+import { formatResumeDate } from "../../utils/dateUtils";
 
 export default function EducationSection({ education, editMode, onUpdate }) {
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    try {
-      const date = new Date(dateString + '-01');
-      return format(date, 'MMM yyyy');
-    } catch (err) {
-      return dateString;
-    }
-  };
-
   const handleEduUpdate = (index, field, value) => {
     const updated = [...education];
     updated[index] = { ...updated[index], [field]: value };
@@ -65,9 +55,9 @@ export default function EducationSection({ education, editMode, onUpdate }) {
                 <div>
                   <Label className="text-slate-900 dark:text-slate-200 font-semibold">Graduation Date</Label>
                   <Input
-                    type="month"
                     value={edu.graduation_date || ""}
                     onChange={(e) => handleEduUpdate(index, "graduation_date", e.target.value)}
+                    placeholder="YYYY-MM or YYYY"
                     className="text-slate-900 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600"
                   />
                 </div>
@@ -94,7 +84,7 @@ export default function EducationSection({ education, editMode, onUpdate }) {
             </div>
             <div className="text-right text-slate-700 dark:text-slate-400 text-sm">
               {edu.location && <p>{edu.location}</p>}
-              {edu.graduation_date && <p>{formatDate(edu.graduation_date)}</p>}
+              {edu.graduation_date && <p>{formatResumeDate(edu.graduation_date)}</p>}
             </div>
           </div>
         ))}

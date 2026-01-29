@@ -6,10 +6,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Calendar, Eye, Trash2, Upload, Sparkles, Edit2, Check, X, Copy, Loader2, Lock, FileEdit } from "lucide-react";
+import { Plus, Calendar, Eye, Trash2, Upload, Sparkles, Edit2, Check, X, Copy, Loader2, Lock, FileEdit, Crown, Zap, Download } from "lucide-react";
 import { motion } from "framer-motion";
 import { ConfirmDialog, NotificationPopup } from "../components/ui/notification";
 import ExportDropdown from "../components/resume/ExportDropdown";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function MyResumes() {
   const navigate = useNavigate();
@@ -34,25 +35,17 @@ export default function MyResumes() {
   });
   const [notification, setNotification] = useState({ open: false, title: "", message: "", type: "success" });
 
-  // Use React Query for user data - this ensures we get fresh data after subscription
-  const { data: currentUser, isLoading: checkingSubscription } = useQuery({
-    queryKey: ["current-user"],
-    queryFn: () => api.auth.me(),
-    staleTime: 0, // Always fetch fresh data
-    retry: false,
+  // Use Auth context for user data and tier information
+  const { user: currentUser, loading: checkingSubscription, isPaid, canAccessFeature, aiCredits } = useAuth();
+
+  // Fetch PDF download status for free users
+  const { data: pdfStatus } = useQuery({
+    queryKey: ['pdf-status'],
+    queryFn: () => api.exports.getPdfStatus(),
+    enabled: !isPaid && !!currentUser,
   });
 
-  // Compute subscription status from user data
-  const isSubscribed = React.useMemo(() => {
-    if (!currentUser) return false;
-    if (currentUser.is_subscribed && currentUser.subscription_end_date) {
-      const endDate = new Date(currentUser.subscription_end_date);
-      return endDate > new Date();
-    }
-    return false;
-  }, [currentUser]);
-
-  const handleSubscriptionRequired = () => {
+  const handleUpgrade = () => {
     navigate(createPageUrl("Pricing?returnUrl=MyResumes"));
   };
 
@@ -77,12 +70,16 @@ export default function MyResumes() {
     queryKey: ['my-resumes', currentUser?.email],
     queryFn: () => api.entities.Resume.filter({ created_by: currentUser.email }, "-updated_date"),
     enabled: !!currentUser?.email,
+    refetchOnMount: 'always',  // Always refetch when returning to this page
+    staleTime: 0,              // Data is immediately stale
   });
 
+  // Only fetch versions for paid users who have access to version history
   const { data: allVersions = [] } = useQuery({
-    queryKey: ['all-resume-versions', currentUser?.email],
+    queryKey: ['all-resume-versions', currentUser?.email, isPaid],
     queryFn: () => api.entities.ResumeVersion.filter({ created_by: currentUser.email }),
-    enabled: !!currentUser?.email,
+    enabled: !!currentUser?.email && canAccessFeature('versionHistory'),
+    retry: false, // Don't retry on 403 errors
   });
 
   const versionCounts = React.useMemo(() => {
@@ -110,7 +107,12 @@ export default function MyResumes() {
     mutationFn: async (resumeId) => {
       setDuplicatingId(resumeId);
       const originalResume = resumes.find(r => r.id === resumeId);
-      const resumeDataRecord = await api.entities.ResumeData.getByResumeId(resumeId);
+      let resumeDataRecord = null;
+      try {
+        resumeDataRecord = await api.entities.ResumeData.getByResumeId(resumeId);
+      } catch (e) {
+        // Resume may not have a resume_data record yet (e.g. empty "New Resume")
+      }
 
       const newResume = await api.entities.Resume.create({
         title: `Copy of ${originalResume.title}`,
@@ -183,13 +185,19 @@ export default function MyResumes() {
         console.log('No ResumeData to delete or error deleting:', err);
       }
 
-      // Delete associated versions
-      const versionRecords = await api.entities.ResumeVersion.filter({ resume_id: resumeId });
-      for (const record of versionRecords) {
-        await api.entities.ResumeVersion.delete(record.id);
+      // Delete associated versions (may fail for free users who don't have version access)
+      try {
+        const versionRecords = await api.entities.ResumeVersion.filter({ resume_id: resumeId });
+        for (const record of versionRecords) {
+          await api.entities.ResumeVersion.delete(record.id);
+        }
+      } catch (err) {
+        // Free users may not have access to versions, that's okay -
+        // versions will be cascade deleted with the resume anyway
+        console.log('No versions to delete or access denied:', err.message);
       }
 
-      // Delete the resume itself
+      // Delete the resume itself (this will cascade delete any remaining data)
       await api.entities.Resume.delete(resumeId);
     },
     onSuccess: () => {
@@ -842,17 +850,15 @@ export default function MyResumes() {
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div className="flex gap-2">
               <Button
-                onClick={() => isSubscribed ? navigate(createPageUrl("UploadResume")) : handleSubscriptionRequired()}
+                onClick={() => navigate(createPageUrl("UploadResume"))}
                 className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white"
-                disabled={!isSubscribed}
               >
                 <Upload className="w-4 h-4 mr-2" />
                 Upload Resume
               </Button>
               <Button
-                onClick={() => isSubscribed ? navigate(createPageUrl("BuildWizard")) : handleSubscriptionRequired()}
+                onClick={() => navigate(createPageUrl("BuildWizard"))}
                 className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
-                disabled={!isSubscribed}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Create Resume
@@ -939,27 +945,61 @@ export default function MyResumes() {
             </div>
           </div>
 
-          {!isSubscribed && sortedResumes.length > 0 && (
+          {/* Free tier stats and upgrade prompt */}
+          {!isPaid && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className="mb-6"
             >
-              <Card className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-300 dark:border-yellow-700">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <Lock className="w-5 h-5 text-yellow-700 dark:text-yellow-400" />
-                    <div>
-                      <p className="font-semibold text-yellow-900 dark:text-yellow-100">Subscription Required</p>
-                      <p className="text-sm text-yellow-800 dark:text-yellow-200">Your resumes are locked. Subscribe to regain access.</p>
+              <Card className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/50 border border-slate-200 dark:border-slate-700">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  {/* Usage Stats */}
+                  <div className="flex flex-wrap items-center gap-4">
+                    {/* AI Credits */}
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
+                      aiCredits?.remaining <= 0
+                        ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                        : aiCredits?.remaining <= 2
+                          ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                          : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                    }`}>
+                      <Zap className="w-4 h-4" />
+                      <span className="font-medium">{aiCredits?.remaining ?? 5}/{aiCredits?.total ?? 5}</span>
+                      <span className="hidden sm:inline">AI credits</span>
                     </div>
+
+                    {/* PDF Downloads */}
+                    {pdfStatus && (
+                      <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
+                        pdfStatus.remaining <= 0
+                          ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                          : pdfStatus.remaining <= 1
+                            ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                            : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+                      }`}>
+                        <Download className="w-4 h-4" />
+                        <span className="font-medium">{pdfStatus.remaining}/{pdfStatus.limit}</span>
+                        <span className="hidden sm:inline">PDF credits</span>
+                      </div>
+                    )}
                   </div>
-                  <Button
-                    onClick={handleSubscriptionRequired}
-                    className="bg-yellow-600 hover:bg-yellow-700 dark:bg-yellow-500 dark:hover:bg-yellow-600 text-white"
-                  >
-                    Subscribe Now
-                  </Button>
+
+                  {/* Upgrade CTA */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-slate-600 dark:text-slate-400 hidden md:inline">
+                      <Crown className="w-4 h-4 inline mr-1 text-amber-500" />
+                      Upgrade for unlimited
+                    </span>
+                    <Button
+                      onClick={handleUpgrade}
+                      size="sm"
+                      className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Upgrade
+                    </Button>
+                  </div>
                 </div>
               </Card>
             </motion.div>
@@ -979,41 +1019,26 @@ export default function MyResumes() {
             <Card className="p-12 border-2 border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
               <div className="text-center">
                 <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
-                  {isSubscribed ? "No resumes yet" : "Get Started with a Subscription"}
+                  No resumes yet
                 </h3>
                 <p className="text-slate-600 dark:text-slate-400 mb-6">
-                  {isSubscribed 
-                    ? "Create your first resume or upload an existing one to get started"
-                    : "Subscribe to create and manage unlimited resumes with AI-powered features"
-                  }
+                  Create your first resume or upload an existing one to get started
                 </p>
                 <div className="flex gap-3 justify-center">
-                  {isSubscribed ? (
-                    <>
-                      <Button
-                        onClick={() => navigate(createPageUrl("BuildWizard"))}
-                        className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
-                      >
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Build From Scratch
-                      </Button>
-                      <Button
-                        onClick={() => navigate(createPageUrl("UploadResume"))}
-                        className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white"
-                      >
-                        <Upload className="w-4 h-4 mr-2" />
-                        Upload Existing
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      onClick={handleSubscriptionRequired}
-                      className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
-                    >
-                      <Lock className="w-4 h-4 mr-2" />
-                      Subscribe to Get Started
-                    </Button>
-                  )}
+                  <Button
+                    onClick={() => navigate(createPageUrl("BuildWizard"))}
+                    className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                  >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Build From Scratch
+                  </Button>
+                  <Button
+                    onClick={() => navigate(createPageUrl("UploadResume"))}
+                    className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Existing
+                  </Button>
                 </div>
               </div>
             </Card>
@@ -1026,22 +1051,7 @@ export default function MyResumes() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
                 >
-                  <Card className={`group relative hover:shadow-xl transition-all duration-300 border-2 overflow-hidden ${
-                    !isSubscribed 
-                      ? "opacity-50 grayscale cursor-not-allowed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800" 
-                      : "border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 bg-white dark:bg-slate-800"
-                  }`}>
-                    {!isSubscribed && (
-                      <div className="absolute inset-0 bg-slate-900/10 dark:bg-slate-950/50 backdrop-blur-[1px] z-10 flex items-center justify-center">
-                        <button
-                          onClick={handleSubscriptionRequired}
-                          className="bg-white dark:bg-slate-800 rounded-lg p-4 shadow-lg text-center hover:shadow-xl transition-shadow border border-slate-200 dark:border-slate-700"
-                        >
-                          <Lock className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mx-auto mb-2" />
-                          <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">Unlock</p>
-                        </button>
-                      </div>
-                    )}
+                  <Card className="group relative hover:shadow-xl transition-all duration-300 border-2 overflow-hidden border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 bg-white dark:bg-slate-800">
                     
                     <div className="p-4">
                       {editingId === resume.id ? (
@@ -1056,14 +1066,12 @@ export default function MyResumes() {
                               }}
                               className="text-base font-bold bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100"
                               autoFocus
-                              disabled={!isSubscribed}
                             />
                             <Button
                               size="sm"
                               variant="ghost"
                               onClick={() => saveTitle(resume.id)}
                               className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-500"
-                              disabled={!isSubscribed}
                             >
                               <Check className="w-4 h-4" />
                             </Button>
@@ -1081,27 +1089,32 @@ export default function MyResumes() {
                         <div className="mb-3">
                           <div className="group/title flex items-center gap-2 mb-2">
                             <h3
-                              className={`text-base font-bold text-slate-900 dark:text-slate-100 ${isSubscribed ? "cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400" : ""} transition-colors flex-1 min-w-0 truncate`}
-                              onClick={() => isSubscribed && startEditing(resume)}
+                              className="text-base font-bold text-slate-900 dark:text-slate-100 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex-1 min-w-0 truncate"
+                              onClick={() => startEditing(resume)}
                               title={resume.title}
                             >
                               {resume.title}
                             </h3>
-                            {isSubscribed && (
-                              <button
-                                onClick={() => startEditing(resume)}
-                                className="opacity-0 group-hover/title:opacity-100 transition-opacity text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 flex-shrink-0"
-                                title="Edit title"
-                              >
-                                <Edit2 className="w-3 h-3" />
-                              </button>
-                            )}
+                            <button
+                              onClick={() => startEditing(resume)}
+                              className="opacity-0 group-hover/title:opacity-100 transition-opacity text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 flex-shrink-0"
+                              title="Edit title"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
                           </div>
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              <span>Versions saved: {versionCounts[resume.id] || 0}</span>
-                            </div>
+                            {canAccessFeature('versionHistory') ? (
+                              <div className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                <span>Versions saved: {versionCounts[resume.id] || 0}</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                                <Crown className="w-3 h-3" />
+                                <span>Version history (Premium)</span>
+                              </div>
+                            )}
                             <div className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
                                 <span>Last saved: {new Date(resume.updated_at).toLocaleDateString('en-US', {
@@ -1119,9 +1132,8 @@ export default function MyResumes() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => isSubscribed ? navigate(createPageUrl(`BuildWizard?resumeId=${resume.id}`)) : handleSubscriptionRequired()}
+                            onClick={() => navigate(createPageUrl(`BuildWizard?resumeId=${resume.id}`))}
                             className="flex-1 text-sm h-8 border-emerald-300 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300"
-                            disabled={!isSubscribed}
                           >
                             <FileEdit className="w-3 h-3 mr-1" />
                             Continue Wizard
@@ -1130,9 +1142,8 @@ export default function MyResumes() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => isSubscribed ? navigate(createPageUrl(`ResumeReview?id=${resume.id}`)) : handleSubscriptionRequired()}
+                            onClick={() => navigate(createPageUrl(`ResumeReview?id=${resume.id}`))}
                             className="flex-1 text-sm h-8 border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-950 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300"
-                            disabled={!isSubscribed}
                           >
                             <Edit2 className="w-3 h-3 mr-1" />
                             Edit
@@ -1141,8 +1152,8 @@ export default function MyResumes() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => isSubscribed ? handleDuplicate(resume.id) : handleSubscriptionRequired()}
-                          disabled={!isSubscribed || duplicatingId === resume.id}
+                          onClick={() => handleDuplicate(resume.id)}
+                          disabled={duplicatingId === resume.id}
                           className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950 px-2 h-8"
                           title="Duplicate resume"
                         >
@@ -1154,14 +1165,13 @@ export default function MyResumes() {
                         </Button>
                         <ExportDropdown
                           onSelectFormat={(formatId) => handleExportFormat(resume.id, formatId)}
-                          disabled={!isSubscribed}
                           isExporting={exportingId === resume.id}
                         />
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => isSubscribed ? handleDelete(resume.id) : handleSubscriptionRequired()}
-                          disabled={!isSubscribed || deletingId === resume.id}
+                          onClick={() => handleDelete(resume.id)}
+                          disabled={deletingId === resume.id}
                           className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950 px-2 h-8"
                           title="Delete resume"
                         >
@@ -1173,10 +1183,8 @@ export default function MyResumes() {
                         </Button>
                       </div>
                     </div>
-                    
-                    <div className={`h-1 bg-gradient-to-r from-indigo-600 to-blue-600 dark:from-indigo-500 dark:to-blue-500 transform transition-transform duration-300 origin-left ${
-                      !isSubscribed ? "scale-x-0" : "scale-x-0 group-hover:scale-x-100"
-                    }`}></div>
+
+                    <div className="h-1 bg-gradient-to-r from-indigo-600 to-blue-600 dark:from-indigo-500 dark:to-blue-500 transform transition-transform duration-300 origin-left scale-x-0 group-hover:scale-x-100"></div>
                   </Card>
                 </motion.div>
               ))}
@@ -1190,22 +1198,7 @@ export default function MyResumes() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
                 >
-                  <Card className={`group relative hover:shadow-lg transition-all duration-300 border-2 overflow-hidden ${
-                    !isSubscribed 
-                      ? "opacity-50 grayscale cursor-not-allowed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800" 
-                      : "border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 bg-white dark:bg-slate-800"
-                  }`}>
-                    {!isSubscribed && (
-                      <div className="absolute inset-0 bg-slate-900/10 dark:bg-slate-950/50 backdrop-blur-[1px] z-10 flex items-center justify-center">
-                        <button
-                          onClick={handleSubscriptionRequired}
-                          className="bg-white dark:bg-slate-800 rounded-lg p-3 shadow-lg text-center hover:shadow-xl transition-shadow border border-slate-200 dark:border-slate-700"
-                        >
-                          <Lock className="w-6 h-6 text-indigo-600 dark:text-indigo-400 mx-auto mb-1" />
-                          <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">Unlock</p>
-                        </button>
-                      </div>
-                    )}
+                  <Card className="group relative hover:shadow-lg transition-all duration-300 border-2 overflow-hidden border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 bg-white dark:bg-slate-800">
                     
                     <div className="p-4">
                       {editingId === resume.id ? (
@@ -1219,14 +1212,12 @@ export default function MyResumes() {
                             }}
                             className="text-base font-bold flex-1 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100"
                             autoFocus
-                            disabled={!isSubscribed}
                           />
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => saveTitle(resume.id)}
                             className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-500"
-                            disabled={!isSubscribed}
                           >
                             <Check className="w-4 h-4" />
                           </Button>
@@ -1243,28 +1234,33 @@ export default function MyResumes() {
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <div className="group/title flex items-center gap-2">
-                              <h3 
-                                className={`text-base font-bold text-slate-900 dark:text-slate-100 ${isSubscribed ? "cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400" : ""} transition-colors truncate`}
-                                onClick={() => isSubscribed && startEditing(resume)}
+                              <h3
+                                className="text-base font-bold text-slate-900 dark:text-slate-100 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate"
+                                onClick={() => startEditing(resume)}
                                 title={resume.title}
                               >
                                 {resume.title}
                               </h3>
-                              {isSubscribed && (
-                                <button
-                                  onClick={() => startEditing(resume)}
-                                  className="opacity-0 group-hover/title:opacity-100 transition-opacity text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 flex-shrink-0"
-                                  title="Edit title"
-                                >
-                                  <Edit2 className="w-3 h-3" />
-                                </button>
-                              )}
+                              <button
+                                onClick={() => startEditing(resume)}
+                                className="opacity-0 group-hover/title:opacity-100 transition-opacity text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 flex-shrink-0"
+                                title="Edit title"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
                             </div>
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400 mt-1">
-                              <div className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                <span>Versions saved: {versionCounts[resume.id] || 0}</span>
-                              </div>
+                              {canAccessFeature('versionHistory') ? (
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" />
+                                  <span>Versions saved: {versionCounts[resume.id] || 0}</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                                  <Crown className="w-3 h-3" />
+                                  <span>Version history (Premium)</span>
+                                </div>
+                              )}
                               <div className="flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />
                                 <span>Last saved: {new Date(resume.updated_at).toLocaleString('en-US', {
@@ -1284,9 +1280,8 @@ export default function MyResumes() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => isSubscribed ? navigate(createPageUrl(`BuildWizard?resumeId=${resume.id}`)) : handleSubscriptionRequired()}
+                                onClick={() => navigate(createPageUrl(`BuildWizard?resumeId=${resume.id}`))}
                                 className="text-sm h-8 px-3 border-emerald-300 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300"
-                                disabled={!isSubscribed}
                               >
                                 <FileEdit className="w-3 h-3 mr-1" />
                                 Continue Wizard
@@ -1295,9 +1290,8 @@ export default function MyResumes() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => isSubscribed ? navigate(createPageUrl(`ResumeReview?id=${resume.id}`)) : handleSubscriptionRequired()}
+                                onClick={() => navigate(createPageUrl(`ResumeReview?id=${resume.id}`))}
                                 className="text-sm h-8 px-3 border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-950 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300"
-                                disabled={!isSubscribed}
                               >
                                 <Edit2 className="w-3 h-3 mr-1" />
                                 Edit
@@ -1306,8 +1300,8 @@ export default function MyResumes() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => isSubscribed ? handleDuplicate(resume.id) : handleSubscriptionRequired()}
-                              disabled={!isSubscribed || duplicatingId === resume.id}
+                              onClick={() => handleDuplicate(resume.id)}
+                              disabled={duplicatingId === resume.id}
                               className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950 px-2 h-8"
                               title="Duplicate resume"
                             >
@@ -1319,14 +1313,13 @@ export default function MyResumes() {
                             </Button>
                             <ExportDropdown
                               onSelectFormat={(formatId) => handleExportFormat(resume.id, formatId)}
-                              disabled={!isSubscribed}
                               isExporting={exportingId === resume.id}
                             />
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => isSubscribed ? handleDelete(resume.id) : handleSubscriptionRequired()}
-                              disabled={!isSubscribed || deletingId === resume.id}
+                              onClick={() => handleDelete(resume.id)}
+                              disabled={deletingId === resume.id}
                               className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950 px-2 h-8"
                               title="Delete resume"
                             >
@@ -1340,10 +1333,8 @@ export default function MyResumes() {
                         </div>
                       )}
                     </div>
-                    
-                    <div className={`h-1 bg-gradient-to-r from-indigo-600 to-blue-600 dark:from-indigo-500 dark:to-blue-500 transform transition-transform duration-300 origin-left ${
-                      !isSubscribed ? "scale-x-0" : "scale-x-0 group-hover:scale-x-100"
-                    }`}></div>
+
+                    <div className="h-1 bg-gradient-to-r from-indigo-600 to-blue-600 dark:from-indigo-500 dark:to-blue-500 transform transition-transform duration-300 origin-left scale-x-0 group-hover:scale-x-100"></div>
                   </Card>
                 </motion.div>
               ))}

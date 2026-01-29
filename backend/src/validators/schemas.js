@@ -26,20 +26,13 @@ export const uuidParamSchema = z.object({
   id: z.string().uuid('ID must be a valid UUID')
 });
 
-// Sanitize string to prevent XSS (basic HTML entity encoding)
-const sanitizeString = (str) => {
-  if (typeof str !== 'string') return str;
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
-};
-
-// Safe string that sanitizes HTML
+// Safe string with trimming (HTML encoding is handled by React at render time)
+// Note: We don't HTML-encode on input because:
+// 1. React automatically escapes strings in JSX
+// 2. Encoding on input causes issues when data is used in non-HTML contexts (JSON, exports, etc.)
+// 3. Double-encoding can occur if output libraries also encode
 export const safeString = (maxLength = 1000) =>
-  z.string().max(maxLength).transform(sanitizeString);
+  z.string().max(maxLength).transform(str => str.trim());
 
 // ============================================
 // Auth Schemas
@@ -84,13 +77,17 @@ export const updateProfileSchema = z.object({
 export const createResumeSchema = z.object({
   title: safeString(200).refine(val => val.trim().length > 0, 'Title is required'),
   status: z.enum(['draft', 'active', 'archived']).optional().default('draft'),
-  source_type: z.enum(['manual', 'upload', 'ai']).optional().default('manual')
+  source_type: z.enum(['manual', 'upload', 'uploaded', 'ai']).optional().default('manual'),
+  file_url: z.string().max(500).nullish(),
+  last_edited_step: z.string().max(50).nullish()
 });
 
 export const updateResumeSchema = z.object({
   title: safeString(200).optional(),
   status: z.enum(['draft', 'active', 'archived']).optional(),
-  source_type: z.enum(['manual', 'upload', 'ai']).optional()
+  source_type: z.enum(['manual', 'upload', 'uploaded', 'ai']).optional(),
+  file_url: z.string().max(500).nullish(),
+  last_edited_step: z.string().max(50).nullish()
 });
 
 // Personal info schema for resume data

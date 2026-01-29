@@ -20,6 +20,9 @@ client.interceptors.response.use(
       localStorage.removeItem('resumakr_token');
       window.location.href = '/login';
     }
+    if (error.response?.status === 503 && error.response?.data?.maintenance) {
+      window.location.reload();
+    }
     return Promise.reject(error);
   }
 );
@@ -107,6 +110,9 @@ export const api = {
       async update(id, updates) {
         const { data } = await client.put(`/resume-data/${id}`, updates);
         return data;
+      },
+      async delete(id) {
+        await client.delete(`/resume-data/${id}`);
       }
     },
     ResumeVersion: {
@@ -199,6 +205,18 @@ export const api = {
       },
       async delete(id) {
         await client.delete(`/prompts/${id}`);
+      },
+      async listSystem() {
+        const { data } = await client.get('/prompts/system');
+        return data;
+      },
+      async updateSystem(promptType, updates) {
+        const { data } = await client.put(`/prompts/system/${promptType}`, updates);
+        return data;
+      },
+      async resetSystem(promptType) {
+        const { data } = await client.post(`/prompts/system/${promptType}/reset`);
+        return data;
       }
     },
     CouponCode: {
@@ -243,18 +261,14 @@ export const api = {
       }
     },
     AppSettings: {
-      async list() {
-        const { data } = await client.get('/settings');
+      async getPublic() {
+        const { data } = await client.get('/settings/public');
         return data;
       },
       async get(key) {
         const { data } = await client.get(`/settings/${key}`);
         return data;
       },
-      async update(key, updates) {
-        const { data } = await client.put(`/settings/${key}`, updates);
-        return data;
-      }
     },
     Users: {
       async list(params) {
@@ -276,6 +290,75 @@ export const api = {
       async delete(id) {
         await client.delete(`/users/${id}`);
       }
+    },
+    Template: {
+      async list() {
+        const { data } = await client.get('/templates');
+        return data;
+      },
+      async get(id) {
+        const { data } = await client.get(`/templates/${id}`);
+        return data;
+      },
+      async select(id) {
+        const { data } = await client.post(`/templates/${id}/select`);
+        return data;
+      },
+      async categories() {
+        const { data } = await client.get('/templates/meta/categories');
+        return data;
+      }
+    },
+    StripeProfile: {
+      async list() {
+        const { data } = await client.get('/stripe-profiles');
+        return data;
+      },
+      async get(id) {
+        const { data } = await client.get(`/stripe-profiles/${id}`);
+        return data;
+      },
+      async getActive() {
+        const { data } = await client.get('/stripe-profiles/active');
+        return data;
+      },
+      async create(profileData) {
+        const { data } = await client.post('/stripe-profiles', profileData);
+        return data;
+      },
+      async update(id, updates) {
+        const { data } = await client.put(`/stripe-profiles/${id}`, updates);
+        return data;
+      },
+      async delete(id) {
+        await client.delete(`/stripe-profiles/${id}`);
+      },
+      async activate(id) {
+        const { data } = await client.post(`/stripe-profiles/${id}/activate`);
+        return data;
+      },
+      async test(id) {
+        const { data } = await client.post(`/stripe-profiles/${id}/test`);
+        return data;
+      },
+      async getPrices(id) {
+        const { data } = await client.get(`/stripe-profiles/${id}/prices`);
+        return data;
+      },
+      async getPublicConfig() {
+        const { data } = await client.get('/stripe-profiles/config/public');
+        return data;
+      }
+    }
+  },
+  exports: {
+    async getPdfStatus() {
+      const { data } = await client.get('/exports/pdf-status');
+      return data;
+    },
+    async recordPdfDownload() {
+      const { data } = await client.post('/exports/pdf-download');
+      return data;
     }
   },
   integrations: {
@@ -301,6 +384,14 @@ export const api = {
           job_description: jobDescription,
           resume_data: resumeData
         });
+        return data;
+      },
+      async ImproveSection(params) {
+        const { data } = await client.post('/ai/improve-section', params);
+        return data;
+      },
+      async GenerateCoverLetter(params) {
+        const { data } = await client.post('/ai/generate-cover-letter', params);
         return data;
       }
     }

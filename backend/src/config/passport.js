@@ -51,14 +51,14 @@ async function findOrCreateOAuthUser(provider, profileId, email, displayName, av
       }
     }
 
-    // 3. Create new OAuth-only user
+    // 3. Create new OAuth-only user with freemium tier defaults
     console.log(`[OAuth] Creating new ${provider} user: ${email}`);
 
     const result = await query(
-      `INSERT INTO users (email, full_name, oauth_provider, oauth_id, avatar_url, role, is_subscribed, last_login)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      `INSERT INTO users (email, full_name, oauth_provider, oauth_id, avatar_url, role, is_subscribed, last_login, user_tier, ai_credits_total, ai_credits_used, tier_updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9, $10, NOW())
        RETURNING *`,
-      [email || `${provider}_${profileId}@oauth.local`, displayName || '', provider, profileId, avatarUrl, 'user', false]
+      [email || `${provider}_${profileId}@oauth.local`, displayName || '', provider, profileId, avatarUrl, 'user', false, 'free', 5, 0]
     );
 
     const newUser = result.rows[0];

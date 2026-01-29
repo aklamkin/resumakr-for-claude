@@ -1,17 +1,161 @@
 import Stripe from 'stripe';
 import { query } from '../config/database.js';
 
-// Initialize Stripe only if API key is provided
-// This prevents the app from crashing if Stripe is not configured yet
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY)
-  : null;
+// Cache for the active Stripe profile to avoid DB queries on every request
+let cachedProfile = null;
+let profileCacheTime = 0;
+const PROFILE_CACHE_TTL = 60000; // 1 minute cache
 
-// Helper to check if Stripe is configured
-function ensureStripeConfigured() {
-  if (!stripe) {
-    throw new Error('Stripe is not configured. Please set STRIPE_SECRET_KEY in environment variables.');
+/**
+ * Get the active Stripe profile from database.
+ * A fully configured profile in the database is required - no env var fallback.
+ */
+async function getActiveStripeProfile() {
+  // Check cache first
+  if (cachedProfile && (Date.now() - profileCacheTime) < PROFILE_CACHE_TTL) {
+    return cachedProfile;
   }
+
+  try {
+    const result = await query('SELECT * FROM stripe_profiles WHERE is_active = true LIMIT 1');
+
+    if (result.rows.length > 0) {
+      const profile = result.rows[0];
+      // Don't cache placeholder keys
+      if (!profile.secret_key.includes('placeholder')) {
+        cachedProfile = profile;
+        profileCacheTime = Date.now();
+        return profile;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to query stripe_profiles:', error.message);
+  }
+
+  return null;
+}
+
+/**
+ * Get a configured Stripe instance from the active database profile.
+ */
+async function getStripeInstance() {
+  const profile = await getActiveStripeProfile();
+
+  if (!profile || !profile.secret_key || profile.secret_key.includes('placeholder')) {
+    return null;
+  }
+
+  return new Stripe(profile.secret_key);
+}
+
+/**
+ * Clear the profile cache (call when profile is switched)
+ */
+export function clearStripeProfileCache() {
+  cachedProfile = null;
+  profileCacheTime = 0;
+}
+
+/**
+ * Get the active profile's publishable key (for frontend)
+ */
+export async function getPublishableKey() {
+  const profile = await getActiveStripeProfile();
+  return profile?.publishable_key || null;
+}
+
+/**
+ * Get the current Stripe environment (test or live)
+ */
+export async function getStripeEnvironment() {
+  const profile = await getActiveStripeProfile();
+  return profile?.environment || 'test';
+}
+
+/**
+ * Get the active Stripe profile's ID (UUID).
+ */
+export async function getActiveProfileId() {
+  const profile = await getActiveStripeProfile();
+  return profile?.id || null;
+}
+
+/**
+ * Get a user's Stripe data for the active profile.
+ * Returns { stripe_customer_id, stripe_subscription_id, payment_method_last4, payment_method_brand } or null.
+ */
+async function getUserStripeData(userId) {
+  const profileId = await getActiveProfileId();
+  if (!profileId) return null;
+
+  const result = await query(
+    `SELECT stripe_customer_id, stripe_subscription_id, payment_method_last4, payment_method_brand
+     FROM user_stripe_data
+     WHERE user_id = $1 AND stripe_profile_id = $2`,
+    [userId, profileId]
+  );
+
+  return result.rows[0] || null;
+}
+
+/**
+ * Upsert a user's Stripe data for the active profile.
+ * Only updates fields that are provided (non-null).
+ */
+async function upsertUserStripeData(userId, data) {
+  const profileId = await getActiveProfileId();
+  if (!profileId) {
+    console.error('Cannot upsert user Stripe data: no active profile');
+    return;
+  }
+
+  const { stripe_customer_id, stripe_subscription_id, payment_method_last4, payment_method_brand } = data;
+
+  await query(
+    `INSERT INTO user_stripe_data (user_id, stripe_profile_id, stripe_customer_id, stripe_subscription_id, payment_method_last4, payment_method_brand)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (user_id, stripe_profile_id) DO UPDATE SET
+       stripe_customer_id = COALESCE($3, user_stripe_data.stripe_customer_id),
+       stripe_subscription_id = COALESCE($4, user_stripe_data.stripe_subscription_id),
+       payment_method_last4 = COALESCE($5, user_stripe_data.payment_method_last4),
+       payment_method_brand = COALESCE($6, user_stripe_data.payment_method_brand),
+       updated_at = NOW()`,
+    [userId, profileId, stripe_customer_id || null, stripe_subscription_id || null, payment_method_last4 || null, payment_method_brand || null]
+  );
+}
+
+/**
+ * Find a user ID by their Stripe customer ID within the active profile.
+ * Used by webhook handlers that receive a customer ID from Stripe.
+ */
+async function findUserByStripeCustomerId(stripeCustomerId) {
+  const profileId = await getActiveProfileId();
+  if (!profileId) return null;
+
+  const result = await query(
+    `SELECT user_id FROM user_stripe_data
+     WHERE stripe_profile_id = $1 AND stripe_customer_id = $2`,
+    [profileId, stripeCustomerId]
+  );
+
+  return result.rows[0]?.user_id || null;
+}
+
+// Helper to check if Stripe is configured and get instance
+async function ensureStripeConfigured() {
+  const stripeInstance = await getStripeInstance();
+  if (!stripeInstance) {
+    throw new Error('Stripe is not configured. Please configure a Stripe profile in Admin Settings > Stripe.');
+  }
+  return stripeInstance;
+}
+
+/**
+ * Get the webhook secret from active profile
+ */
+async function getWebhookSecret() {
+  const profile = await getActiveStripeProfile();
+  return profile?.webhook_secret || null;
 }
 
 /**
@@ -45,13 +189,13 @@ function calculateSubscriptionEndDate(period, duration) {
  * Get or create a Stripe customer for a user
  */
 export async function getOrCreateCustomer(userId, email, fullName) {
-  ensureStripeConfigured();
+  const stripe = await ensureStripeConfigured();
 
-  // Check if user already has a Stripe customer ID
-  const userResult = await query('SELECT stripe_customer_id FROM users WHERE id = $1', [userId]);
+  // Check if user already has a Stripe customer ID for the active profile
+  const stripeData = await getUserStripeData(userId);
 
-  if (userResult.rows[0]?.stripe_customer_id) {
-    return userResult.rows[0].stripe_customer_id;
+  if (stripeData?.stripe_customer_id) {
+    return stripeData.stripe_customer_id;
   }
 
   // Create new Stripe customer
@@ -63,8 +207,8 @@ export async function getOrCreateCustomer(userId, email, fullName) {
     }
   });
 
-  // Store customer ID in database
-  await query('UPDATE users SET stripe_customer_id = $1 WHERE id = $2', [customer.id, userId]);
+  // Store customer ID in junction table for the active profile
+  await upsertUserStripeData(userId, { stripe_customer_id: customer.id });
 
   return customer.id;
 }
@@ -82,6 +226,7 @@ export async function createCheckoutSession({
   couponCode = null,
   trialDays = null
 }) {
+  const stripe = await ensureStripeConfigured();
   const customerId = await getOrCreateCustomer(userId, email, fullName);
 
   const sessionParams = {
@@ -155,16 +300,16 @@ export async function createCheckoutSession({
  * Create a billing portal session for subscription management
  */
 export async function createBillingPortalSession(userId, returnUrl) {
-  ensureStripeConfigured();
+  const stripe = await ensureStripeConfigured();
 
-  const userResult = await query('SELECT stripe_customer_id FROM users WHERE id = $1', [userId]);
+  const stripeData = await getUserStripeData(userId);
 
-  if (!userResult.rows[0]?.stripe_customer_id) {
+  if (!stripeData?.stripe_customer_id) {
     throw new Error('No Stripe customer found for this user');
   }
 
   const session = await stripe.billingPortal.sessions.create({
-    customer: userResult.rows[0].stripe_customer_id,
+    customer: stripeData.stripe_customer_id,
     return_url: returnUrl
   });
 
@@ -175,17 +320,17 @@ export async function createBillingPortalSession(userId, returnUrl) {
  * Cancel a subscription
  */
 export async function cancelSubscription(userId) {
-  ensureStripeConfigured();
+  const stripe = await ensureStripeConfigured();
 
-  const userResult = await query('SELECT stripe_subscription_id FROM users WHERE id = $1', [userId]);
+  const stripeData = await getUserStripeData(userId);
 
-  if (!userResult.rows[0]?.stripe_subscription_id) {
+  if (!stripeData?.stripe_subscription_id) {
     throw new Error('No active subscription found');
   }
 
-  const subscription = await stripe.subscriptions.cancel(userResult.rows[0].stripe_subscription_id);
+  const subscription = await stripe.subscriptions.cancel(stripeData.stripe_subscription_id);
 
-  // Update user record
+  // Update application-level state on users table
   await query(
     'UPDATE users SET is_subscribed = false, cancelled_at = NOW() WHERE id = $1',
     [userId]
@@ -195,12 +340,16 @@ export async function cancelSubscription(userId) {
 }
 
 /**
- * Verify webhook signature
+ * Verify webhook signature (async to support DB-stored webhook secret)
  */
-export function verifyWebhookSignature(payload, signature) {
-  ensureStripeConfigured();
+export async function verifyWebhookSignature(payload, signature) {
+  const stripe = await ensureStripeConfigured();
+  const endpointSecret = await getWebhookSecret();
 
-  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!endpointSecret) {
+    throw new Error('Webhook secret not configured');
+  }
+
   return stripe.webhooks.constructEvent(payload, signature, endpointSecret);
 }
 
@@ -217,7 +366,7 @@ export async function handleCheckoutSessionCompleted(session) {
   console.log('subscription:', session.subscription);
 
   try {
-    ensureStripeConfigured();
+    const stripe = await ensureStripeConfigured();
 
     const userId = session.client_reference_id || session.metadata?.user_id;
 
@@ -259,22 +408,29 @@ export async function handleCheckoutSessionCompleted(session) {
         console.log(`Using current_period_end from subscription item: ${currentPeriodEnd}`);
       }
 
-      // Validate current_period_end before using it
-      if (!currentPeriodEnd || typeof currentPeriodEnd !== 'number') {
-        console.error(`Invalid current_period_end: ${currentPeriodEnd} (type: ${typeof currentPeriodEnd})`);
-        throw new Error('Subscription has invalid current_period_end');
+      // Also try billing_cycle_anchor as fallback (some API versions use this)
+      if (!currentPeriodEnd && subscription.billing_cycle_anchor) {
+        console.log(`current_period_end not found, billing_cycle_anchor: ${subscription.billing_cycle_anchor}`);
       }
 
-      const subscriptionEndDate = new Date(currentPeriodEnd * 1000);
+      // Log available subscription fields for debugging
+      console.log(`Subscription fields check: current_period_end=${currentPeriodEnd}, type=${typeof currentPeriodEnd}`);
 
-      // Validate the date is valid
-      if (isNaN(subscriptionEndDate.getTime())) {
-        console.error(`Invalid date calculated from current_period_end: ${subscription.current_period_end}`);
-        throw new Error('Invalid subscription end date calculated');
+      let subscriptionEndDate = null;
+
+      // Try to use Stripe's current_period_end if valid
+      if (currentPeriodEnd && typeof currentPeriodEnd === 'number') {
+        subscriptionEndDate = new Date(currentPeriodEnd * 1000);
+        if (isNaN(subscriptionEndDate.getTime())) {
+          console.warn(`Invalid date from current_period_end ${currentPeriodEnd}, will use plan duration`);
+          subscriptionEndDate = null;
+        }
+      } else {
+        console.log(`current_period_end not available or not a number: ${currentPeriodEnd} (type: ${typeof currentPeriodEnd})`);
       }
 
       const priceId = subscription.items?.data?.[0]?.price?.id;
-      console.log(`Stripe current_period_end: ${subscriptionEndDate.toISOString()}, priceId: ${priceId}`);
+      console.log(`Stripe current_period_end result: ${subscriptionEndDate?.toISOString() || 'N/A'}, priceId: ${priceId}`);
 
       // Get plan from database by stripe_price_id - including period and duration for accurate end date
       let planId = 'premium';
@@ -297,30 +453,46 @@ export async function handleCheckoutSessionCompleted(session) {
 
       // Calculate subscription end date based on plan period and duration
       // Monthly plans use calendar month increments (Jan 23 -> Feb 23) to keep billing date consistent
-      let finalEndDate = subscriptionEndDate;
+      // PRIORITY: Plan-based calculation > Stripe's current_period_end
+      let finalEndDate = null;
+
       if (planDuration && typeof planDuration === 'number' && planPeriod) {
+        // Preferred: Use plan duration for accurate billing alignment
         finalEndDate = calculateSubscriptionEndDate(planPeriod, planDuration);
         console.log(`Using plan period=${planPeriod}, duration=${planDuration} for end date: ${finalEndDate.toISOString()}`);
-      } else {
+      } else if (subscriptionEndDate) {
+        // Fallback: Use Stripe's current_period_end if plan info unavailable
+        finalEndDate = subscriptionEndDate;
         console.log(`No plan period/duration found, using Stripe current_period_end: ${finalEndDate.toISOString()}`);
+      } else {
+        // Last resort: Calculate 30 days from now as a safe default
+        finalEndDate = new Date();
+        finalEndDate.setDate(finalEndDate.getDate() + 30);
+        console.warn(`Neither plan duration nor Stripe current_period_end available, defaulting to 30 days: ${finalEndDate.toISOString()}`);
       }
 
       console.log(`Updating user ${userId} with: planId=${planId}, endDate=${finalEndDate.toISOString()}, subId=${subscription.id}`);
       let updateResult;
       try {
+        // Update application-level subscription state on users table
         updateResult = await query(
           `UPDATE users SET
             is_subscribed = true,
             subscription_plan = $1,
             subscription_end_date = $2,
-            stripe_subscription_id = $3,
             subscription_started_at = NOW(),
+            user_tier = 'paid',
+            ai_credits_total = 999999,
+            tier_updated_at = NOW(),
             updated_at = NOW()
-          WHERE id = $4
+          WHERE id = $3
           RETURNING id, email, is_subscribed`,
-          [planId, finalEndDate, subscription.id, userId]
+          [planId, finalEndDate, userId]
         );
         console.log(`UPDATE query completed, rows affected: ${updateResult.rows.length}`);
+
+        // Store Stripe-specific subscription ID in junction table (per-profile)
+        await upsertUserStripeData(userId, { stripe_subscription_id: subscription.id });
       } catch (dbError) {
         console.error(`Database UPDATE failed: ${dbError.message}`);
         console.error(`DB Error details: ${JSON.stringify(dbError)}`);
@@ -332,7 +504,7 @@ export async function handleCheckoutSessionCompleted(session) {
         return;
       }
 
-      console.log(`SUCCESS: Subscription activated for user ${userId} (${updateResult.rows[0].email}), plan: ${planId}, ends: ${subscriptionEndDate.toISOString()}`);
+      console.log(`SUCCESS: Subscription activated for user ${userId} (${updateResult.rows[0].email}), plan: ${planId}, ends: ${finalEndDate.toISOString()}`);
     } else {
       // For one-time payments (if we ever support them)
       console.log(`Non-subscription checkout completed for user ${userId}`);
@@ -358,8 +530,9 @@ export async function handleSubscriptionCreated(subscription) {
   }
 
   // Check if user is already subscribed (checkout.session.completed may have already processed)
-  const existingUser = await query('SELECT is_subscribed, stripe_subscription_id FROM users WHERE id = $1', [userId]);
-  if (existingUser.rows[0]?.is_subscribed && existingUser.rows[0]?.stripe_subscription_id) {
+  const existingUser = await query('SELECT is_subscribed FROM users WHERE id = $1', [userId]);
+  const existingStripeData = await getUserStripeData(userId);
+  if (existingUser.rows[0]?.is_subscribed && existingStripeData?.stripe_subscription_id) {
     console.log(`User ${userId} already has active subscription, skipping duplicate update`);
     return;
   }
@@ -368,7 +541,7 @@ export async function handleSubscriptionCreated(subscription) {
   if (!subscription.current_period_end || typeof subscription.current_period_end !== 'number') {
     console.log('Invalid current_period_end in subscription, retrieving full subscription from Stripe');
     try {
-      ensureStripeConfigured();
+      const stripe = await ensureStripeConfigured();
       subscription = await stripe.subscriptions.retrieve(subscription.id, {
         expand: ['items.data.price']
       });
@@ -386,18 +559,15 @@ export async function handleSubscriptionCreated(subscription) {
     console.log(`Using current_period_end from subscription item: ${currentPeriodEnd}`);
   }
 
-  // Final validation
-  if (!currentPeriodEnd || typeof currentPeriodEnd !== 'number') {
-    console.error(`Invalid current_period_end after all attempts: ${currentPeriodEnd}`);
-    return;
-  }
+  console.log(`handleSubscriptionCreated: current_period_end=${currentPeriodEnd}, type=${typeof currentPeriodEnd}`);
 
-  const subscriptionEndDate = new Date(currentPeriodEnd * 1000);
-
-  // Validate the date is valid before database update
-  if (isNaN(subscriptionEndDate.getTime())) {
-    console.error('Invalid subscription end date calculated, skipping update');
-    return;
+  let subscriptionEndDate = null;
+  if (currentPeriodEnd && typeof currentPeriodEnd === 'number') {
+    subscriptionEndDate = new Date(currentPeriodEnd * 1000);
+    if (isNaN(subscriptionEndDate.getTime())) {
+      console.warn(`Invalid date from current_period_end ${currentPeriodEnd}, will use plan duration`);
+      subscriptionEndDate = null;
+    }
   }
 
   const priceId = subscription.items?.data?.[0]?.price?.id;
@@ -416,24 +586,39 @@ export async function handleSubscriptionCreated(subscription) {
   }
 
   // Calculate subscription end date based on plan period and duration
-  // Monthly plans use calendar month increments to keep billing date consistent
-  let finalEndDate = subscriptionEndDate;
+  // PRIORITY: Plan-based calculation > Stripe's current_period_end
+  let finalEndDate = null;
+
   if (planDuration && typeof planDuration === 'number' && planPeriod) {
     finalEndDate = calculateSubscriptionEndDate(planPeriod, planDuration);
     console.log(`Using plan period=${planPeriod}, duration=${planDuration} for end date: ${finalEndDate.toISOString()}`);
+  } else if (subscriptionEndDate) {
+    finalEndDate = subscriptionEndDate;
+    console.log(`No plan info, using Stripe current_period_end: ${finalEndDate.toISOString()}`);
+  } else {
+    // Default to 30 days if nothing else available
+    finalEndDate = new Date();
+    finalEndDate.setDate(finalEndDate.getDate() + 30);
+    console.warn(`No date source available, defaulting to 30 days: ${finalEndDate.toISOString()}`);
   }
 
+  // Update application-level subscription state on users table
   await query(
     `UPDATE users SET
       is_subscribed = true,
       subscription_plan = $1,
       subscription_end_date = $2,
-      stripe_subscription_id = $3,
       subscription_started_at = NOW(),
+      user_tier = 'paid',
+      ai_credits_total = 999999,
+      tier_updated_at = NOW(),
       updated_at = NOW()
-    WHERE id = $4`,
-    [planId, finalEndDate, subscription.id, userId]
+    WHERE id = $3`,
+    [planId, finalEndDate, userId]
   );
+
+  // Store Stripe subscription ID in junction table (per-profile)
+  await upsertUserStripeData(userId, { stripe_subscription_id: subscription.id });
 
   console.log(`Subscription created for user ${userId}`);
 }
@@ -485,9 +670,11 @@ export async function handleSubscriptionUpdated(subscription) {
     `UPDATE users SET
       is_subscribed = $1,
       subscription_end_date = $2,
+      user_tier = $4,
+      tier_updated_at = NOW(),
       updated_at = NOW()
     WHERE id = $3`,
-    [isActive, finalEndDate, userId]
+    [isActive, finalEndDate, userId, isActive ? 'paid' : 'free']
   );
 
   console.log(`Subscription updated for user ${userId}, status: ${subscription.status}`);
@@ -507,6 +694,8 @@ export async function handleSubscriptionDeleted(subscription) {
   await query(
     `UPDATE users SET
       is_subscribed = false,
+      user_tier = 'free',
+      tier_updated_at = NOW(),
       cancelled_at = NOW(),
       updated_at = NOW()
     WHERE id = $1`,
@@ -560,13 +749,13 @@ export async function handlePaymentSucceeded(paymentIntent) {
     ]
   );
 
-  // Update user's payment method info
+  // Update user's payment method info in junction table (per-profile)
   if (paymentIntent.charges?.data[0]?.payment_method_details?.card) {
     const card = paymentIntent.charges.data[0].payment_method_details.card;
-    await query(
-      'UPDATE users SET payment_method_last4 = $1, payment_method_brand = $2 WHERE id = $3',
-      [card.last4, card.brand, userId]
-    );
+    await upsertUserStripeData(userId, {
+      payment_method_last4: card.last4,
+      payment_method_brand: card.brand
+    });
   }
 
   console.log(`Payment succeeded for user ${userId}, amount: ${paymentIntent.amount / 100} ${paymentIntent.currency}`);
@@ -578,15 +767,13 @@ export async function handlePaymentSucceeded(paymentIntent) {
 export async function handleInvoicePaymentSucceeded(invoice) {
   const customerId = invoice.customer;
 
-  // Get user by stripe_customer_id
-  const userResult = await query('SELECT id FROM users WHERE stripe_customer_id = $1', [customerId]);
+  // Get user by stripe_customer_id within the active profile
+  const userId = await findUserByStripeCustomerId(customerId);
 
-  if (userResult.rows.length === 0) {
-    console.error(`No user found for Stripe customer ${customerId}`);
+  if (!userId) {
+    console.error(`No user found for Stripe customer ${customerId} in active profile`);
     return;
   }
-
-  const userId = userResult.rows[0].id;
 
   // Ensure subscription is marked as active
   await query(
@@ -601,7 +788,7 @@ export async function handleInvoicePaymentSucceeded(invoice) {
  * Create a Stripe Product for a subscription plan
  */
 export async function createStripeProduct(planData) {
-  ensureStripeConfigured();
+  const stripe = await ensureStripeConfigured();
 
   const product = await stripe.products.create({
     name: planData.name,
@@ -620,7 +807,7 @@ export async function createStripeProduct(planData) {
  * Create a Stripe Price for a product
  */
 export async function createStripePrice(productId, planData) {
-  ensureStripeConfigured();
+  const stripe = await ensureStripeConfigured();
 
   // Convert period to Stripe interval format
   let interval = 'month';
@@ -662,7 +849,7 @@ export async function createStripePrice(productId, planData) {
  * Note: Price changes require creating a new price, not updating the product
  */
 export async function updateStripeProduct(productId, planData) {
-  ensureStripeConfigured();
+  const stripe = await ensureStripeConfigured();
 
   const product = await stripe.products.update(productId, {
     name: planData.name,
@@ -678,7 +865,7 @@ export async function updateStripeProduct(productId, planData) {
  * Archive a Stripe Price (makes it inactive)
  */
 export async function archiveStripePrice(priceId) {
-  ensureStripeConfigured();
+  const stripe = await ensureStripeConfigured();
 
   const price = await stripe.prices.update(priceId, {
     active: false
@@ -689,11 +876,38 @@ export async function archiveStripePrice(priceId) {
 }
 
 /**
- * Master sync function - creates or updates plan in Stripe
+ * Save a plan's Stripe IDs to the active profile's price_ids JSONB.
+ * This keeps each profile's plan mappings in sync.
+ */
+async function savePlanIdToActiveProfile(planId, stripeProductId, stripePriceId) {
+  try {
+    const profileResult = await query('SELECT id, price_ids FROM stripe_profiles WHERE is_active = true LIMIT 1');
+    if (profileResult.rows.length === 0) return;
+
+    const profile = profileResult.rows[0];
+    const priceIds = profile.price_ids || {};
+    priceIds[planId] = {
+      stripe_product_id: stripeProductId,
+      stripe_price_id: stripePriceId
+    };
+
+    await query(
+      'UPDATE stripe_profiles SET price_ids = $1, updated_at = NOW() WHERE id = $2',
+      [JSON.stringify(priceIds), profile.id]
+    );
+    console.log(`Saved plan ${planId} Stripe IDs to active profile ${profile.id}`);
+  } catch (error) {
+    console.error('Failed to save plan IDs to active profile:', error.message);
+  }
+}
+
+/**
+ * Master sync function - creates or updates plan in Stripe.
+ * Also stores the resulting IDs in the active profile's price_ids for profile switching.
  * Returns { stripe_product_id, stripe_price_id, created, updated }
  */
 export async function syncPlanToStripe(planData, options = {}) {
-  ensureStripeConfigured();
+  const stripe = await ensureStripeConfigured();
 
   const { createIfMissing = true } = options;
   let product;
@@ -709,6 +923,9 @@ export async function syncPlanToStripe(planData, options = {}) {
       product = await createStripeProduct(planData);
       price = await createStripePrice(product.id, planData);
       created = true;
+
+      // Save to active profile
+      await savePlanIdToActiveProfile(planData.plan_id, product.id, price.id);
 
       return {
         stripe_product_id: product.id,
@@ -762,9 +979,14 @@ export async function syncPlanToStripe(planData, options = {}) {
         }
       }
 
+      const finalPriceId = price ? price.id : planData.stripe_price_id;
+
+      // Save to active profile
+      await savePlanIdToActiveProfile(planData.plan_id, planData.stripe_product_id, finalPriceId);
+
       return {
         stripe_product_id: planData.stripe_product_id,
-        stripe_price_id: price ? price.id : planData.stripe_price_id,
+        stripe_price_id: finalPriceId,
         created: false,
         updated: true,
         priceChanged: priceChanged
@@ -802,5 +1024,9 @@ export default {
   createStripePrice,
   updateStripeProduct,
   archiveStripePrice,
-  syncPlanToStripe
+  syncPlanToStripe,
+  getPublishableKey,
+  getStripeEnvironment,
+  getActiveProfileId,
+  clearStripeProfileCache
 };

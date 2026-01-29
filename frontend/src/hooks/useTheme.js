@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import api from '@/api/apiClient';
 
 /**
- * Global theme hook that manages theme application
- * Should be called once at the app level
+ * Global theme hook that manages theme application.
+ * On first load with no user preference, fetches the admin-configured default_theme.
+ * Should be called once at the app level.
  */
 export function useThemeInitializer() {
   useEffect(() => {
@@ -21,8 +23,21 @@ export function useThemeInitializer() {
       }
     };
 
-    // Apply theme immediately
-    applyTheme(currentTheme);
+    // If user has a saved preference, apply immediately
+    if (currentTheme) {
+      applyTheme(currentTheme);
+    } else {
+      // No user preference yet - apply system theme while we fetch the admin default
+      applyTheme('system');
+      api.entities.AppSettings.getPublic()
+        .then((settings) => {
+          // Only apply if user still hasn't set a preference
+          if (settings.default_theme && !localStorage.getItem('theme')) {
+            applyTheme(settings.default_theme);
+          }
+        })
+        .catch(() => {});
+    }
 
     // Listen for system preference changes
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');

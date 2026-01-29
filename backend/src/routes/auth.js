@@ -32,8 +32,10 @@ router.post('/register', validate(registerSchema), async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const result = await query(
-      'INSERT INTO users (email, password, full_name, role, is_subscribed) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, full_name, role, is_subscribed, created_at',
-      [email, hashedPassword, full_name, 'user', false]
+      `INSERT INTO users (email, password, full_name, role, is_subscribed, user_tier, ai_credits_total, ai_credits_used, tier_updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+       RETURNING id, email, full_name, role, is_subscribed, user_tier, ai_credits_total, ai_credits_used, created_at`,
+      [email, hashedPassword, full_name, 'user', false, 'free', 5, 0]
     );
 
     const user = result.rows[0];
@@ -46,7 +48,13 @@ router.post('/register', validate(registerSchema), async (req, res) => {
         email: user.email,
         full_name: user.full_name,
         role: user.role,
-        is_subscribed: user.is_subscribed
+        is_subscribed: user.is_subscribed,
+        tier: 'free',
+        aiCredits: {
+          total: 5,
+          used: 0,
+          remaining: 5
+        }
       },
       token
     });
@@ -86,8 +94,31 @@ router.post('/login', validate(loginSchema), async (req, res) => {
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
     const token = jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 
+    // Calculate effective tier
+    const { getUserTier, getTierLimits } = await import('../utils/tierLimits.js');
+    const effectiveTier = getUserTier(user);
+    const tierLimits = getTierLimits(effectiveTier);
+
     log.auth('Login successful', { userId: user.id, email, requestId: req.requestId });
-    res.json({ user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role, is_subscribed: user.is_subscribed, subscription_plan: user.subscription_plan, subscription_end_date: user.subscription_end_date }, token });
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        role: user.role,
+        is_subscribed: user.is_subscribed,
+        subscription_plan: user.subscription_plan,
+        subscription_end_date: user.subscription_end_date,
+        tier: effectiveTier,
+        tierLimits: tierLimits,
+        aiCredits: {
+          total: user.ai_credits_total || 5,
+          used: user.ai_credits_used || 0,
+          remaining: Math.max(0, (user.ai_credits_total || 5) - (user.ai_credits_used || 0))
+        }
+      },
+      token
+    });
   } catch (error) {
     log.error('Login failed', { error: error.message, requestId: req.requestId });
     res.status(500).json({ error: 'Login failed' });
@@ -95,7 +126,23 @@ router.post('/login', validate(loginSchema), async (req, res) => {
 });
 
 router.get('/me', authenticate, async (req, res) => {
-  res.json({ id: req.user.id, email: req.user.email, full_name: req.user.full_name, role: req.user.role, is_subscribed: req.user.is_subscribed, subscription_plan: req.user.subscription_plan, subscription_end_date: req.user.subscription_end_date });
+  res.json({
+    id: req.user.id,
+    email: req.user.email,
+    full_name: req.user.full_name,
+    role: req.user.role,
+    is_subscribed: req.user.is_subscribed,
+    subscription_plan: req.user.subscription_plan,
+    subscription_end_date: req.user.subscription_end_date,
+    // Freemium tier info
+    tier: req.user.effectiveTier,
+    tierLimits: req.user.tierLimits,
+    aiCredits: {
+      total: req.user.ai_credits_total || 5,
+      used: req.user.ai_credits_used || 0,
+      remaining: Math.max(0, (req.user.ai_credits_total || 5) - (req.user.ai_credits_used || 0))
+    }
+  });
 });
 
 router.put('/me', authenticate, validate(updateProfileSchema), async (req, res) => {

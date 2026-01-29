@@ -16,13 +16,6 @@ import Help from "./Help";
 import AccountSettings from "./AccountSettings.jsx";
 import SubscriptionManagement from "./SubscriptionManagement";
 import SubscriptionSuccess from "./SubscriptionSuccess";
-import SettingsProviders from "./SettingsProviders";
-import SettingsPrompts from "./SettingsPrompts";
-import SettingsPlans from "./SettingsPlans";
-import SettingsCodes from "./SettingsCodes";
-import SettingsHelp from "./SettingsHelp";
-import SettingsInterface from "./SettingsInterface";
-import SettingsUsers from "./SettingsUsers";
 import Documentation from "./Documentation";
 
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
@@ -36,13 +29,6 @@ const PAGES = {
     Pricing: Pricing,
     Help: Help,
     SubscriptionManagement: SubscriptionManagement,
-    SettingsProviders: SettingsProviders,
-    SettingsPrompts: SettingsPrompts,
-    SettingsPlans: SettingsPlans,
-    SettingsCodes: SettingsCodes,
-    SettingsHelp: SettingsHelp,
-    SettingsInterface: SettingsInterface,
-    SettingsUsers: SettingsUsers,
     Documentation: Documentation,
 }
 
@@ -95,13 +81,6 @@ function PagesContent() {
                 <Route path="/AccountSettings" element={<AccountSettings />} />
                 <Route path="/SubscriptionManagement" element={<SubscriptionManagement />} />
                 <Route path="/subscription-success" element={<SubscriptionSuccess />} />
-                <Route path="/SettingsProviders" element={<SettingsProviders />} />
-                <Route path="/SettingsPrompts" element={<SettingsPrompts />} />
-                <Route path="/SettingsPlans" element={<SettingsPlans />} />
-                <Route path="/SettingsCodes" element={<SettingsCodes />} />
-                <Route path="/SettingsHelp" element={<SettingsHelp />} />
-                <Route path="/SettingsInterface" element={<SettingsInterface />} />
-                <Route path="/SettingsUsers" element={<SettingsUsers />} />
                 <Route path="/Documentation" element={<Documentation />} />
             </Routes>
         </Layout>

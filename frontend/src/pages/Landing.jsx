@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   Sparkles, Upload, ArrowRight, FileCheck, Zap, Shield,
-  CheckCircle, Star, Target, Clock, Users, Award,
+  CheckCircle, Target, Clock, Users, Award,
   ChevronRight, Play, FileText, Wand2, BarChart3
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -15,9 +15,17 @@ export default function Landing() {
   const navigate = useNavigate();
   const [user, setUser] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
+  const [animationsEnabled, setAnimationsEnabled] = React.useState(true);
 
   React.useEffect(() => {
     checkAuth();
+    api.entities.AppSettings.getPublic()
+      .then((settings) => {
+        if (settings.landing_animations_enabled === false) {
+          setAnimationsEnabled(false);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const checkAuth = async () => {
@@ -33,6 +41,9 @@ export default function Landing() {
       setLoading(false);
     }
   };
+
+  // When animations are disabled, motion elements render instantly with no transition
+  const anim = (props) => animationsEnabled ? props : {};
 
   const handlePrimaryCTA = () => {
     if (user) {
@@ -100,34 +111,31 @@ export default function Landing() {
     }
   ];
 
-  // Testimonials
-  const testimonials = [
+  // Benefits/Why Choose section
+  const benefits = [
     {
-      quote: "I went from zero callbacks to 5 interviews in two weeks. The AI suggestions were spot-on.",
-      author: "Sarah M.",
-      role: "Software Engineer",
-      company: "Now at Google"
+      title: "Beat the ATS",
+      description: "Our templates are designed to pass Applicant Tracking Systems, so your resume actually reaches recruiters instead of getting filtered out.",
+      icon: "🎯"
     },
     {
-      quote: "Finally, a resume builder that doesn't feel like a chore. Simple, fast, and the results speak for themselves.",
-      author: "James K.",
-      role: "Marketing Manager",
-      company: "Now at Spotify"
+      title: "AI-Powered Writing",
+      description: "Get intelligent suggestions for improving your bullet points, highlighting achievements, and using industry-specific keywords.",
+      icon: "✨"
     },
     {
-      quote: "The ATS optimization feature alone is worth it. My resume was getting filtered out before—not anymore.",
-      author: "Priya R.",
-      role: "Data Analyst",
-      company: "Now at Amazon"
+      title: "Professional Templates",
+      description: "Start with beautiful, recruiter-approved templates. Choose from free options or unlock 40+ premium designs.",
+      icon: "📄"
     }
   ];
 
-  // Stats
+  // Value propositions (honest, feature-based)
   const stats = [
-    { value: "10K+", label: "Resumes Created" },
-    { value: "94%", label: "Interview Rate" },
-    { value: "2 min", label: "Average Build Time" },
-    { value: "4.9/5", label: "User Rating" }
+    { value: "Free", label: "Templates" },
+    { value: "AI", label: "Powered Writing" },
+    { value: "ATS", label: "Optimized Format" },
+    { value: "Free", label: "To Get Started" }
   ];
 
   const fadeInUp = {
@@ -193,9 +201,7 @@ export default function Landing() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             className="text-center max-w-4xl mx-auto"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            {...anim({ initial: { opacity: 0, y: 30 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.6 } })}
           >
             {/* Badge */}
             <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 px-4 py-2 rounded-full text-sm font-medium mb-8">
@@ -259,9 +265,7 @@ export default function Landing() {
           {/* Hero Image/Preview */}
           <motion.div
             className="mt-16 relative"
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
+            {...anim({ initial: { opacity: 0, y: 40 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.6, delay: 0.2 } })}
           >
             <div className="relative mx-auto max-w-5xl">
               <div className="bg-gradient-to-b from-slate-100 to-white dark:from-slate-800 dark:to-slate-900 rounded-2xl shadow-2xl shadow-slate-200/50 dark:shadow-slate-900/50 border border-slate-200 dark:border-slate-700 overflow-hidden">
@@ -325,10 +329,7 @@ export default function Landing() {
               <motion.div
                 key={index}
                 className="text-center"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
+                {...anim({ initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true }, transition: { delay: index * 0.1 } })}
               >
                 <div className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-1">
                   {stat.value}
@@ -347,9 +348,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             className="text-center max-w-3xl mx-auto mb-16"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            {...anim({ initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true } })}
           >
             <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-4">
               Stop Getting Filtered Out
@@ -362,9 +361,7 @@ export default function Landing() {
 
           <div className="grid md:grid-cols-2 gap-8 items-center">
             <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
+              {...anim({ initial: { opacity: 0, x: -20 }, whileInView: { opacity: 1, x: 0 }, viewport: { once: true } })}
               className="space-y-6"
             >
               <div className="flex items-start gap-4 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
@@ -388,17 +385,15 @@ export default function Landing() {
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
+              {...anim({ initial: { opacity: 0, x: 20 }, whileInView: { opacity: 1, x: 0 }, viewport: { once: true } })}
               className="relative"
             >
               <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-8 text-white">
                 <BarChart3 className="w-12 h-12 mb-4 opacity-80" />
-                <h3 className="text-2xl font-bold mb-2">94% Interview Rate</h3>
+                <h3 className="text-2xl font-bold mb-2">ATS-Optimized</h3>
                 <p className="opacity-90">
-                  Users who complete their resume with Resumakr's AI suggestions report
-                  significantly higher callback rates compared to DIY resumes.
+                  Our templates and AI suggestions are designed to pass Applicant Tracking Systems,
+                  helping your resume reach human recruiters instead of getting filtered out.
                 </p>
               </div>
             </motion.div>
@@ -411,9 +406,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             className="text-center max-w-3xl mx-auto mb-16"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            {...anim({ initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true } })}
           >
             <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-4">
               Features That Actually Matter
@@ -427,10 +420,7 @@ export default function Landing() {
             {features.map((feature, index) => (
               <motion.div
                 key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
+                {...anim({ initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true }, transition: { delay: index * 0.1 } })}
               >
                 <Card className="h-full p-6 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:shadow-lg transition-shadow">
                   <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-4`}>
@@ -454,9 +444,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             className="text-center max-w-3xl mx-auto mb-16"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            {...anim({ initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true } })}
           >
             <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-4">
               Three Steps to Your Perfect Resume
@@ -471,10 +459,7 @@ export default function Landing() {
               <motion.div
                 key={index}
                 className="relative"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.15 }}
+                {...anim({ initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true }, transition: { delay: index * 0.15 } })}
               >
                 {index < steps.length - 1 && (
                   <div className="hidden md:block absolute top-12 left-1/2 w-full h-0.5 bg-gradient-to-r from-blue-200 to-transparent dark:from-blue-800" />
@@ -499,54 +484,35 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Testimonials */}
+      {/* Why Choose Resumakr */}
       <section className="py-20 bg-slate-50 dark:bg-slate-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             className="text-center max-w-3xl mx-auto mb-16"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            {...anim({ initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true } })}
           >
             <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-4">
-              Trusted by Job Seekers Worldwide
+              Why Choose Resumakr?
             </h2>
             <p className="text-lg text-slate-600 dark:text-slate-400">
-              Real stories from people who landed their dream jobs.
+              Built for job seekers who want results, not just a pretty PDF.
             </p>
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
+            {benefits.map((benefit, index) => (
               <motion.div
                 key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
+                {...anim({ initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true }, transition: { delay: index * 0.1 } })}
               >
                 <Card className="h-full p-6 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-                  <div className="flex gap-1 mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                    ))}
-                  </div>
-                  <blockquote className="text-slate-700 dark:text-slate-300 mb-6 leading-relaxed">
-                    "{testimonial.quote}"
-                  </blockquote>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white font-medium">
-                      {testimonial.author.charAt(0)}
-                    </div>
-                    <div>
-                      <div className="font-medium text-slate-900 dark:text-white">
-                        {testimonial.author}
-                      </div>
-                      <div className="text-sm text-slate-500 dark:text-slate-400">
-                        {testimonial.role} • {testimonial.company}
-                      </div>
-                    </div>
-                  </div>
+                  <div className="text-4xl mb-4">{benefit.icon}</div>
+                  <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-3">
+                    {benefit.title}
+                  </h3>
+                  <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+                    {benefit.description}
+                  </p>
                 </Card>
               </motion.div>
             ))}
@@ -559,9 +525,7 @@ export default function Landing() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-700 p-12 text-center text-white"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            {...anim({ initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true } })}
           >
             {/* Background decoration */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">

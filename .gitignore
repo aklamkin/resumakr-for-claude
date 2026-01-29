@@ -39,9 +39,9 @@ build/
 logs/
 *.log
 
-# Uploads
-uploads/*
-!uploads/.gitkeep
+# Uploads (any uploads dir at any level)
+**/uploads/*
+!**/uploads/.gitkeep
 
 # Database
 *.db
@@ -57,6 +57,8 @@ Thumbs.db
 # Testing
 coverage/
 .nyc_output/
+playwright-report/
+test-results/
 
 # Temporary files
 tmp/
@@ -68,3 +70,5 @@ package-lock.json.backup
 yarn.lock.backup
 backend/node_modules/
 frontend/node_modules/
+config-app/node_modules/
+config-app/dist/

@@ -8,7 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2, Briefcase } from "lucide-react";
 
 export default function WorkExperienceStep({ data, onChange }) {
-  const experiences = data.work_experience || [];
+  // Ensure experiences is always an array (handle corrupted data stored as objects)
+  const experiences = Array.isArray(data.work_experience) ? data.work_experience : [];
 
   const addExperience = () => {
     onChange({

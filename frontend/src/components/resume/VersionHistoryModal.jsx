@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import ResumeTemplate from "./ResumeTemplate";
 import { formatDateTime } from "../utils/dateUtils";
+import { NotificationPopup } from "@/components/ui/notification";
 
 import ReactDOM from "react-dom/client";
 
@@ -24,6 +25,7 @@ export default function VersionHistoryModal({
   const [editingNotes, setEditingNotes] = useState("");
   const [restoreConfirm, setRestoreConfirm] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [notification, setNotification] = useState({ open: false, title: "", message: "", type: "success" });
 
   const startEditing = (version) => {
     setEditingVersionId(version.id);
@@ -73,7 +75,7 @@ export default function VersionHistoryModal({
     // Open a new window for PDF generation
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert('Please allow popups to generate PDF');
+      setNotification({ open: true, title: "Popup Blocked", message: "Please allow popups to generate PDF.", type: "error" });
       return;
     }
 
@@ -416,6 +418,14 @@ export default function VersionHistoryModal({
           </div>
         }
       </AnimatePresence>
+
+      <NotificationPopup
+        open={notification.open}
+        onClose={() => setNotification({ ...notification, open: false })}
+        title={notification.title}
+        message={notification.message}
+        type={notification.type}
+      />
     </>
   );
 }

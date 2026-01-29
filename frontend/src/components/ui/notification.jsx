@@ -13,21 +13,21 @@ export function NotificationPopup({ open, onClose, title, message, type = "succe
   React.useEffect(() => {
     const loadSettings = async () => {
       try {
-        const cachedSettings = localStorage.getItem('app_notification_settings');
-        if (cachedSettings) {
-          setSettings(JSON.parse(cachedSettings));
-        } else {
-          const appSettings = await api.entities.AppSettings.list();
-          const enabledSetting = appSettings.find(s => s.setting_key === 'notifications_enabled');
-          const durationSetting = appSettings.find(s => s.setting_key === 'notification_duration');
-          
-          const newSettings = {
-            enabled: enabledSetting ? enabledSetting.setting_value === 'true' : true,
-            duration: parseInt(durationSetting?.setting_value || '4000')
-          };
-          setSettings(newSettings);
-          localStorage.setItem('app_notification_settings', JSON.stringify(newSettings));
+        const cached = localStorage.getItem('app_notification_settings');
+        const cacheAge = localStorage.getItem('app_notification_settings_ts');
+        // Use cache if less than 5 minutes old
+        if (cached && cacheAge && (Date.now() - parseInt(cacheAge)) < 5 * 60 * 1000) {
+          setSettings(JSON.parse(cached));
+          return;
         }
+        const publicSettings = await api.entities.AppSettings.getPublic();
+        const newSettings = {
+          enabled: publicSettings.notifications_enabled !== undefined ? publicSettings.notifications_enabled : true,
+          duration: publicSettings.notification_duration || 4000
+        };
+        setSettings(newSettings);
+        localStorage.setItem('app_notification_settings', JSON.stringify(newSettings));
+        localStorage.setItem('app_notification_settings_ts', String(Date.now()));
       } catch (error) {
         console.error('Failed to load notification settings:', error);
       }

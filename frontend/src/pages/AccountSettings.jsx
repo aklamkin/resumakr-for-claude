@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Lock, Shield, LogOut, Crown, Sparkles } from 'lucide-react';
+import { User, Lock, LogOut, Crown, Sparkles, Palette } from 'lucide-react';
 import { formatDateWithYear } from '../components/utils/dateUtils';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function AccountSettings() {
   const navigate = useNavigate();
@@ -94,6 +95,20 @@ export default function AccountSettings() {
               <Label>Account Type</Label>
               <Input value={user?.role || 'user'} disabled className="mt-1 capitalize" />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Appearance */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Palette className="h-5 w-5" />
+              <CardTitle>Appearance</CardTitle>
+            </div>
+            <CardDescription>Choose your preferred color theme</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ThemeToggle />
           </CardContent>
         </Card>
 

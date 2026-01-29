@@ -144,6 +144,142 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+/**
+ * Send admin invite email
+ * @param {string} email - New admin's email
+ * @param {string} inviterName - Name of admin who sent the invite
+ */
+export async function sendAdminInviteEmail(email, inviterName) {
+  const configUrl = (process.env.CONFIG_APP_URL || process.env.FRONTEND_URL || 'http://localhost:5174').replace(/\/$/, '') + '/config/login';
+
+  if (!resend) {
+    log.warn('Email service not configured - logging admin invite', {
+      email,
+      inviterName,
+      configUrl,
+      note: 'Set RESEND_API_KEY to enable email sending'
+    });
+
+    if (process.env.NODE_ENV !== 'production') {
+      return { success: true, devMode: true };
+    }
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: "You've been added as a Resumakr admin",
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+    <h1 style="color: white; margin: 0; font-size: 28px;">Resumakr Admin</h1>
+  </div>
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e1e1e1; border-top: none; border-radius: 0 0 10px 10px;">
+    <h2 style="color: #333; margin-top: 0;">You're an Admin Now</h2>
+    <p>Hi,</p>
+    <p><strong>${escapeHtml(inviterName)}</strong> has added you as an administrator for Resumakr. You now have access to the admin configuration panel.</p>
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${configUrl}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 30px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Go to Admin Panel</a>
+    </div>
+    <p style="color: #666; font-size: 14px;">Log in with your Google account or email credentials to get started.</p>
+    <hr style="border: none; border-top: 1px solid #e1e1e1; margin: 30px 0;">
+    <p style="color: #999; font-size: 12px;">If you believe this was sent in error, please contact ${escapeHtml(inviterName)}.</p>
+  </div>
+  <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
+    <p>&copy; ${new Date().getFullYear()} Resumakr. All rights reserved.</p>
+  </div>
+</body>
+</html>`.trim(),
+      text: `You've been added as a Resumakr admin\n\n${inviterName} has added you as an administrator for Resumakr.\n\nLog in to the admin panel: ${configUrl}\n\nIf you believe this was sent in error, please contact ${inviterName}.`
+    });
+
+    if (error) {
+      log.error('Failed to send admin invite email', { email, error: error.message });
+      return { success: false, error: error.message };
+    }
+
+    log.info('Admin invite email sent', { email, messageId: data?.id });
+    return { success: true, messageId: data?.id };
+  } catch (error) {
+    log.error('Error sending admin invite email', { email, error: error.message });
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Send admin removed email
+ * @param {string} email - Removed admin's email
+ * @param {string} removerName - Name of admin who removed them
+ */
+export async function sendAdminRemovedEmail(email, removerName) {
+  if (!resend) {
+    log.warn('Email service not configured - logging admin removal', {
+      email,
+      removerName,
+      note: 'Set RESEND_API_KEY to enable email sending'
+    });
+
+    if (process.env.NODE_ENV !== 'production') {
+      return { success: true, devMode: true };
+    }
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: 'Your Resumakr admin access has been removed',
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+    <h1 style="color: white; margin: 0; font-size: 28px;">Resumakr Admin</h1>
+  </div>
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e1e1e1; border-top: none; border-radius: 0 0 10px 10px;">
+    <h2 style="color: #333; margin-top: 0;">Admin Access Removed</h2>
+    <p>Hi,</p>
+    <p>Your administrator access to Resumakr has been removed by <strong>${escapeHtml(removerName)}</strong>.</p>
+    <p>You will no longer be able to access the admin configuration panel. Your regular Resumakr account (if any) is not affected.</p>
+    <hr style="border: none; border-top: 1px solid #e1e1e1; margin: 30px 0;">
+    <p style="color: #999; font-size: 12px;">If you believe this was done in error, please contact ${escapeHtml(removerName)}.</p>
+  </div>
+  <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
+    <p>&copy; ${new Date().getFullYear()} Resumakr. All rights reserved.</p>
+  </div>
+</body>
+</html>`.trim(),
+      text: `Your Resumakr admin access has been removed\n\nYour administrator access to Resumakr has been removed by ${removerName}.\n\nYou will no longer be able to access the admin configuration panel. Your regular Resumakr account (if any) is not affected.\n\nIf you believe this was done in error, please contact ${removerName}.`
+    });
+
+    if (error) {
+      log.error('Failed to send admin removal email', { email, error: error.message });
+      return { success: false, error: error.message };
+    }
+
+    log.info('Admin removal email sent', { email, messageId: data?.id });
+    return { success: true, messageId: data?.id };
+  } catch (error) {
+    log.error('Error sending admin removal email', { email, error: error.message });
+    return { success: false, error: error.message };
+  }
+}
+
 export default {
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendAdminInviteEmail,
+  sendAdminRemovedEmail
 };

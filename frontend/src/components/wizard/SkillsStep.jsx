@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, X, Sparkles, List, GripVertical, Pencil, Check } from "lucide-react";
 
 export default function SkillsStep({ data, onChange }) {
-  const skills = data.skills || [];
+  // Ensure skills is always an array (handle corrupted data stored as objects)
+  const skills = Array.isArray(data.skills) ? data.skills : [];
   const [newCategory, setNewCategory] = React.useState("");
   const [newSkill, setNewSkill] = React.useState({});
   const [bulkSkills, setBulkSkills] = React.useState({});

@@ -1,12 +1,15 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import { query } from '../config/database.js';
-import { authenticate, requireAdmin } from '../middleware/auth.js';
+import { query } from '../../config/database.js';
+import { authenticateAdmin } from '../../middleware/adminAuth.js';
 
 const router = express.Router();
 
+// All routes require admin authentication
+router.use(authenticateAdmin);
+
 // Get all users with optional search/filter
-router.get('/', authenticate, requireAdmin, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { search, role, auth_method, sort = 'created_at', order = 'desc' } = req.query;
 
@@ -59,7 +62,7 @@ router.get('/', authenticate, requireAdmin, async (req, res) => {
 });
 
 // Get specific user
-router.get('/:id', authenticate, requireAdmin, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const result = await query(
       `SELECT
@@ -85,7 +88,7 @@ router.get('/:id', authenticate, requireAdmin, async (req, res) => {
 });
 
 // Create new user
-router.post('/', authenticate, requireAdmin, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { email, password, full_name, role = 'user' } = req.body;
 
@@ -118,15 +121,10 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
 });
 
 // Update user
-router.put('/:id', authenticate, requireAdmin, async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { email, password, full_name, role, is_subscribed, subscription_plan, subscription_end_date, subscription_price } = req.body;
     const userId = req.params.id;
-
-    // Prevent admin from demoting themselves
-    if (userId == req.user.id && role && role !== 'admin') {
-      return res.status(403).json({ error: 'You cannot change your own admin role' });
-    }
 
     // Validate subscription fields - all three must be set together
     const hasSubscription = is_subscribed === true;
@@ -226,14 +224,9 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
 });
 
 // Delete user
-router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const userId = req.params.id;
-
-    // Prevent admin from deleting themselves
-    if (userId == req.user.id) {
-      return res.status(403).json({ error: 'You cannot delete your own account' });
-    }
 
     const result = await query(
       'DELETE FROM users WHERE id = $1 RETURNING id, email',

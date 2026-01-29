@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, CheckCircle, Lock, CreditCard, Zap, Crown, Tag, X, Loader2, Rocket, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { NotificationPopup } from "../components/ui/notification";
 
 const ICON_MAP = {
   Zap: Zap,
@@ -50,6 +51,7 @@ export default function Pricing() {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [activating, setActivating] = useState(false);
   
+  const [notification, setNotification] = useState({ open: false, title: "", message: "", type: "success" });
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
@@ -71,7 +73,9 @@ export default function Pricing() {
       const fetchedPlans = await api.entities.SubscriptionPlan.list();
       return fetchedPlans.length > 0 ? fetchedPlans : FALLBACK_PLANS;
     },
-    staleTime: 0
+    staleTime: 30000, // Cache for 30 seconds to prevent rapid refetches
+    retry: 3, // Retry failed requests up to 3 times
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
   });
 
   useEffect(() => {
@@ -121,7 +125,7 @@ export default function Pricing() {
       window.location.href = data.url;
     } catch (err) {
       console.error("Error creating checkout session:", err);
-      alert(err.message || "Failed to start checkout. Please try again.");
+      setNotification({ open: true, title: "Checkout Error", message: err.message || "Failed to start checkout. Please try again.", type: "error" });
       setActivating(false);
     }
   };
@@ -226,7 +230,7 @@ export default function Pricing() {
       window.location.href = data.url;
     } catch (err) {
       console.error("Error creating checkout session:", err);
-      alert(err.message || "Failed to start checkout. Please try again.");
+      setNotification({ open: true, title: "Checkout Error", message: err.message || "Failed to start checkout. Please try again.", type: "error" });
       setActivating(false);
     }
   };
@@ -558,6 +562,13 @@ export default function Pricing() {
           </motion.div>
         )}
       </div>
+      <NotificationPopup
+        open={notification.open}
+        onClose={() => setNotification({ ...notification, open: false })}
+        title={notification.title}
+        message={notification.message}
+        type={notification.type}
+      />
     </div>
   );
 }

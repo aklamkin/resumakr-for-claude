@@ -14,8 +14,8 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
   const sig = req.headers['stripe-signature'];
 
   try {
-    // Verify webhook signature
-    const event = stripeService.verifyWebhookSignature(req.body, sig);
+    // Verify webhook signature (async to support DB-stored webhook secret)
+    const event = await stripeService.verifyWebhookSignature(req.body, sig);
 
     // Log event for debugging
     console.log(`Received Stripe webhook: ${event.type}`, event.id);

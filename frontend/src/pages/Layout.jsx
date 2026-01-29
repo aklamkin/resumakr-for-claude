@@ -2,9 +2,9 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import {
-  FileCheck, Settings as SettingsIcon, User,
-  HelpCircle, DollarSign, Brain, FileText, Ticket,
-  ChevronDown, ChevronRight, Monitor, Users, Plus, CreditCard
+  FileCheck, User,
+  HelpCircle, DollarSign,
+  ChevronRight, CreditCard
 } from "lucide-react";
 import {
   Sidebar,
@@ -41,58 +41,14 @@ const navigationItems = [
   },
 ];
 
-const settingsItems = [
-  {
-    title: "Interface",
-    url: createPageUrl("SettingsInterface"),
-    icon: Monitor,
-  },
-  {
-    title: "Users",
-    url: createPageUrl("SettingsUsers"),
-    icon: Users,
-  },
-  {
-    title: "AI Providers",
-    url: createPageUrl("SettingsProviders"),
-    icon: Brain,
-  },
-  {
-    title: "Prompts",
-    url: createPageUrl("SettingsPrompts"),
-    icon: FileText,
-  },
-  {
-    title: "Plans",
-    url: createPageUrl("SettingsPlans"),
-    icon: DollarSign,
-  },
-  {
-    title: "Coupon Codes",
-    url: createPageUrl("SettingsCodes"),
-    icon: Ticket,
-  },
-  {
-    title: "Help & FAQs",
-    url: createPageUrl("SettingsHelp"),
-    icon: HelpCircle,
-  },
-];
-
 export default function Layout({ children, currentPageName, isPublicPage }) {
   const location = useLocation();
   const [user, setUser] = React.useState(null);
-  const [settingsExpanded, setSettingsExpanded] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     loadUser();
   }, []);
-
-  React.useEffect(() => {
-    const isSettingsPage = currentPageName?.startsWith('Settings');
-    setSettingsExpanded(isSettingsPage);
-  }, [currentPageName]);
 
   const loadUser = async () => {
     try {
@@ -112,7 +68,6 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
     }
   };
 
-  const isAdmin = user?.role === 'admin';
   const visibleNavItems = user
     ? navigationItems
     : navigationItems.filter(item => !item.requiresAuth);
@@ -213,24 +168,6 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
 
         {/* Navigation */}
         <SidebarContent className="sidebar-scroll px-3 py-4 flex-1 overflow-y-auto">
-          {/* New Resume Button - Only for authenticated users */}
-          {user && (
-            <div className="mb-4">
-              <Link
-                to={createPageUrl("BuildWizard")}
-                className={cn(
-                  "flex items-center justify-center gap-2 w-full h-10 px-4 rounded-lg",
-                  "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700",
-                  "text-white font-medium text-sm shadow-md hover:shadow-lg",
-                  "transition-all duration-200"
-                )}
-              >
-                <Plus className="h-4 w-4" />
-                <span>New Resume</span>
-              </Link>
-            </div>
-          )}
-
           {/* Main Navigation */}
           <SidebarGroup className="px-0">
             <SidebarGroupContent>
@@ -266,62 +203,6 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
             </SidebarGroupContent>
           </SidebarGroup>
 
-          {/* Admin Settings Section */}
-          {isAdmin && (
-            <SidebarGroup className="mt-4 px-0">
-              <div className="mb-2 px-3">
-                <button
-                  onClick={() => setSettingsExpanded(!settingsExpanded)}
-                  className={cn(
-                    "flex w-full items-center justify-between h-10 px-3 rounded-lg",
-                    "text-sm font-semibold transition-all sidebar-transition",
-                    "hover:bg-muted/70 hover:text-foreground"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <SettingsIcon className="h-4 w-4 flex-shrink-0" />
-                    <span>Admin Settings</span>
-                  </div>
-                  <div>
-                    {settingsExpanded ? (
-                      <ChevronDown className="h-4 w-4 transition-transform" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 transition-transform" />
-                    )}
-                  </div>
-                </button>
-              </div>
-
-              {settingsExpanded && (
-                <SidebarGroupContent className="animate-in slide-in-from-top-2 duration-200">
-                  <SidebarMenu className="space-y-1">
-                    {settingsItems.map((item) => {
-                      const isActive = location.pathname === item.url;
-                      return (
-                        <SidebarMenuItem key={item.title}>
-                          <SidebarMenuButton
-                            asChild
-                            isActive={isActive}
-                            className={cn(
-                              "nav-item-hover h-9 px-3 gap-3 rounded-lg transition-all sidebar-transition",
-                              "hover:bg-muted/70 hover:text-foreground text-sm pl-6",
-                              isActive && "bg-muted text-foreground font-medium"
-                            )}
-                            data-active={isActive}
-                          >
-                            <Link to={item.url} className="flex items-center">
-                              <item.icon className="h-3.5 w-3.5 flex-shrink-0" />
-                              <span>{item.title}</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      );
-                    })}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              )}
-            </SidebarGroup>
-          )}
         </SidebarContent>
 
         {/* Footer - Clickable User Area (goes to Account) */}
@@ -344,7 +225,7 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
         )}
       </Sidebar>
 
-      <main className="flex-1 overflow-auto bg-background">
+      <main id="main-scroll-container" className="flex-1 overflow-auto bg-background">
         {children}
       </main>
     </SidebarProvider>

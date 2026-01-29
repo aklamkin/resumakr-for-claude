@@ -1,22 +1,26 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight, Save, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, X, Lock, Crown, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ResumeTemplate, { TEMPLATE_OPTIONS } from "./ResumeTemplate";
 
-export default function DesignWithAIModal({ 
-  open, 
-  onClose, 
+export default function DesignWithAIModal({
+  open,
+  onClose,
   resumeData,
-  onSaveTemplate 
+  onSaveTemplate,
+  isPremiumUser = false
 }) {
+  const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [customColors, setCustomColors] = useState({});
   const [customFonts, setCustomFonts] = useState({});
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
   if (!resumeData) {
     return null;
@@ -34,7 +38,13 @@ export default function DesignWithAIModal({
 
   const handleSave = async () => {
     if (saving) return;
-    
+
+    // Check if trying to save a premium template without premium access
+    if (currentTemplate.isPremium && !isPremiumUser) {
+      setShowUpgradePrompt(true);
+      return;
+    }
+
     setSaving(true);
     try {
       const templateColors = customColors[currentTemplate.id] || {};
@@ -46,6 +56,14 @@ export default function DesignWithAIModal({
       setSaving(false);
     }
   };
+
+  const handleUpgrade = () => {
+    onClose();
+    navigate('/pricing');
+  };
+
+  // Check if current template is locked for this user
+  const isCurrentTemplateLocked = currentTemplate.isPremium && !isPremiumUser;
 
   const handleColorChange = (colorKey, value) => {
     setCustomColors(prev => ({
@@ -115,16 +133,32 @@ export default function DesignWithAIModal({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.2 }}
-                  className="w-full"
+                  className="w-full relative"
                   style={{ maxWidth: '850px' }}
                 >
-                  <ResumeTemplate 
-                    data={resumeData} 
+                  <ResumeTemplate
+                    data={resumeData}
                     template={currentTemplate.id}
                     scale={1}
                     customColors={templateColors}
                     customFonts={templateFonts}
                   />
+                  {/* Premium lock overlay */}
+                  {isCurrentTemplateLocked && (
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center rounded-lg">
+                      <div className="bg-white/95 dark:bg-slate-800/95 rounded-xl p-6 text-center shadow-xl max-w-xs">
+                        <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <Lock className="w-6 h-6 text-white" />
+                        </div>
+                        <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-1">
+                          Premium Template
+                        </h4>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          Upgrade to access this template
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               </AnimatePresence>
             </div>
@@ -145,20 +179,44 @@ export default function DesignWithAIModal({
 
           <div className="lg:w-80 bg-slate-900 p-6 flex flex-col border-l border-slate-800 overflow-y-auto">
             <div className="flex-1">
+              {/* Free/Premium indicator */}
+              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-700">
+                <span className="text-xs text-slate-400">
+                  {isPremiumUser ? (
+                    <span className="flex items-center gap-1 text-amber-400">
+                      <Crown className="w-3 h-3" /> Premium - All templates unlocked
+                    </span>
+                  ) : (
+                    <span>5 free templates • 6 premium</span>
+                  )}
+                </span>
+              </div>
+
               <div className="space-y-2 mb-6">
-                {TEMPLATE_OPTIONS.map((template, idx) => (
-                  <button
-                    key={template.id}
-                    onClick={() => setCurrentIndex(idx)}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-sm ${
-                      currentIndex === idx
-                        ? 'bg-indigo-600 text-white font-medium'
-                        : 'hover:bg-slate-800 text-slate-300'
-                    }`}
-                  >
-                    {template.name}
-                  </button>
-                ))}
+                {TEMPLATE_OPTIONS.map((template, idx) => {
+                  const isLocked = template.isPremium && !isPremiumUser;
+                  return (
+                    <button
+                      key={template.id}
+                      onClick={() => setCurrentIndex(idx)}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-sm flex items-center justify-between ${
+                        currentIndex === idx
+                          ? 'bg-indigo-600 text-white font-medium'
+                          : isLocked
+                            ? 'hover:bg-slate-800 text-slate-500'
+                            : 'hover:bg-slate-800 text-slate-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        {template.name}
+                        {template.isPremium && (
+                          <Crown className="w-3 h-3 text-amber-400" />
+                        )}
+                      </span>
+                      {isLocked && <Lock className="w-3 h-3 text-slate-500" />}
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg p-3 mb-6">
@@ -228,26 +286,75 @@ export default function DesignWithAIModal({
             </div>
 
             <div className="mt-auto">
-              <Button
-                onClick={handleSave}
-                disabled={saving}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 mb-2"
-              >
-                {saving ? (
-                  <>Saving...</>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save This Version
-                  </>
-                )}
-              </Button>
+              {isCurrentTemplateLocked ? (
+                <Button
+                  onClick={handleUpgrade}
+                  className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 mb-2"
+                >
+                  <Crown className="w-4 h-4 mr-2" />
+                  Upgrade to Use This Template
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 mb-2"
+                >
+                  {saving ? (
+                    <>Saving...</>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      {isPremiumUser ? "Save This Version" : "Apply Template"}
+                    </>
+                  )}
+                </Button>
+              )}
               <p className="text-xs text-center text-slate-400">
-                Creates a new version with this template
+                {isCurrentTemplateLocked
+                  ? "Premium templates require an active subscription"
+                  : isPremiumUser
+                    ? "Creates a new version with this template"
+                    : "Applies this template to your resume"}
               </p>
             </div>
           </div>
         </div>
+
+        {/* Upgrade Prompt Dialog */}
+        {showUpgradePrompt && (
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-50 rounded-lg">
+            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 max-w-md mx-4 shadow-2xl">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Crown className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                  Premium Template
+                </h3>
+                <p className="text-slate-600 dark:text-slate-400 mb-6">
+                  This template is available with a premium subscription. Upgrade now to access all {TEMPLATE_OPTIONS.filter(t => t.isPremium).length} premium templates plus additional features.
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowUpgradePrompt(false)}
+                    className="flex-1 dark:border-slate-600 dark:text-slate-300"
+                  >
+                    Maybe Later
+                  </Button>
+                  <Button
+                    onClick={handleUpgrade}
+                    className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700"
+                  >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    View Plans
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

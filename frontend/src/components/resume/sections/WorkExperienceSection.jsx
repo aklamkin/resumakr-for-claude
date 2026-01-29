@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Bot, Undo, Sparkles, Loader2, CheckCircle, GripVertical, Trash2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
-import { format } from "date-fns";
+import { formatResumeDate } from "../../utils/dateUtils";
 import EditableSection from "../EditableSection";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
@@ -33,16 +33,6 @@ export default function WorkExperienceSection({
 
   const foundKeywords = atsResults?.keywords_found_resume || [];
   const missingKeywords = atsResults?.missing_keywords || [];
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    try {
-      const date = new Date(dateString + '-01');
-      return format(date, 'MMM yyyy');
-    } catch (err) {
-      return dateString;
-    }
-  };
 
   const handleExpUpdate = (index, field, value) => {
     const updated = [...workExperience];
@@ -253,7 +243,7 @@ export default function WorkExperienceSection({
                 <div className="text-right text-slate-700 dark:text-slate-400 flex-shrink-0 ml-4">
                   {exp.location && <p className="whitespace-nowrap">{exp.location}</p>}
                   <p className="text-sm whitespace-nowrap">
-                    {formatDate(exp.start_date)} - {exp.current ? "Present" : formatDate(exp.end_date)}
+                    {formatResumeDate(exp.start_date)} - {exp.current ? "Present" : formatResumeDate(exp.end_date)}
                   </p>
                 </div>
               </div>

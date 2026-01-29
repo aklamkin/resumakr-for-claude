@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Plus, Trash2, GraduationCap } from "lucide-react";
 
 export default function EducationStep({ data, onChange }) {
-  const education = data.education || [];
+  // Ensure education is always an array (handle corrupted data stored as objects)
+  const education = Array.isArray(data.education) ? data.education : [];
 
   const addEducation = () => {
     onChange({

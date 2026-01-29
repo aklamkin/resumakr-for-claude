@@ -1,0 +1,24 @@
+{
+  "name": "resumakr-for-claude",
+  "version": "1.0.0",
+  "description": "A full-stack SaaS resume builder application with AI-powered features for creating professional, ATS-optimized resumes.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aklamkin/resumakr-for-claude.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/aklamkin/resumakr-for-claude/issues"
+  },
+  "homepage": "https://github.com/aklamkin/resumakr-for-claude#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.58.0"
+  }
+}

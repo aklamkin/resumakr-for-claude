@@ -1,56 +1,27 @@
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import api from "@/api/apiClient";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload, FileText, AlertCircle, ArrowLeft, Loader2, CheckCircle } from "lucide-react";
+import { Upload, FileText, AlertCircle, ArrowLeft, Loader2, CheckCircle, Crown, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function UploadResume() {
   const navigate = useNavigate();
+  const { canAccessFeature, loading: authLoading } = useAuth();
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [checkingSubscription, setCheckingSubscription] = useState(true);
-  const [isSubscribed, setIsSubscribed] = useState(false);
 
-  useEffect(() => {
-    checkSubscription();
-  }, []);
-
-  const checkSubscription = async () => {
-    try {
-      const user = await api.auth.me();
-      
-      // Check if subscription is active and not expired
-      if (user.is_subscribed && user.subscription_end_date) {
-        const endDate = new Date(user.subscription_end_date);
-        const now = new Date();
-        const subscribed = endDate > now;
-        setIsSubscribed(subscribed);
-        
-        // If not subscribed, redirect to pricing
-        if (!subscribed) {
-          navigate(createPageUrl("Pricing?returnUrl=UploadResume"));
-        }
-      } else {
-        // User not subscribed or subscription_end_date is missing/invalid
-        navigate(createPageUrl("Pricing?returnUrl=UploadResume"));
-      }
-    } catch (err) {
-      console.error("Error checking subscription:", err);
-      // If there's an error fetching user info, assume not subscribed or redirect to login/pricing
-      navigate(createPageUrl("Pricing?returnUrl=UploadResume"));
-    } finally {
-      setCheckingSubscription(false);
-    }
-  };
+  // Check if user can access resume parsing feature
+  const canUpload = canAccessFeature('resumeParsing');
 
   const handleDrag = useCallback((e) => {
     e.preventDefault();
@@ -216,7 +187,7 @@ export default function UploadResume() {
         const resume = await api.entities.Resume.create({
           title: `Resume - ${file.name.replace(/\.[^/.]+$/, "")}`,
           status: "draft",
-          source_type: "uploaded",
+          source_type: "upload",
           file_url
         });
 
@@ -253,19 +224,111 @@ export default function UploadResume() {
     }
   };
 
-  if (checkingSubscription) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 flex items-center justify-center transition-colors duration-300">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-indigo-600 dark:border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600 dark:text-slate-400">Checking subscription...</p>
+          <p className="text-slate-600 dark:text-slate-400">Loading...</p>
         </div>
       </div>
     );
   }
 
-  if (!isSubscribed) {
-    return null; // Will redirect in useEffect
+  // Show upgrade prompt for free users who can't access resume parsing
+  if (!canUpload) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 p-6 transition-colors duration-300">
+        <div className="max-w-3xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
+          >
+            <Button
+              variant="ghost"
+              onClick={() => navigate(createPageUrl("Home"))}
+              className="mb-6 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Home
+            </Button>
+
+            <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100 mb-3">Upload Your Resume</h1>
+            <p className="text-lg text-slate-600 dark:text-slate-400">
+              Upload your existing resume and we'll help you enhance it with AI
+            </p>
+          </motion.div>
+
+          {/* Upgrade Prompt */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <Card className="border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 dark:border-amber-700">
+              <div className="p-12 text-center">
+                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center">
+                  <Crown className="w-10 h-10 text-white" />
+                </div>
+
+                <h3 className="text-2xl font-bold text-amber-800 dark:text-amber-200 mb-3">
+                  Premium Feature
+                </h3>
+                <p className="text-amber-700 dark:text-amber-300 mb-6 max-w-md mx-auto">
+                  AI-powered resume parsing is available with a premium subscription.
+                  Upload your resume and let our AI extract and organize all your information automatically.
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button
+                    onClick={() => navigate(createPageUrl("Pricing"))}
+                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+                  >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Upgrade to Premium
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate(createPageUrl("BuildWizard"))}
+                    className="border-amber-400 text-amber-700 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-300 dark:hover:bg-amber-900/30"
+                  >
+                    Create Resume Manually
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="mt-8 p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl"
+          >
+            <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">What you get with Premium:</h4>
+            <ul className="space-y-2 text-sm text-blue-800 dark:text-blue-200">
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                <span>AI-powered resume parsing from PDF/DOCX files</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                <span>Unlimited AI credits for content improvements</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                <span>Access to all premium templates</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                <span>Unlimited PDF downloads without watermark</span>
+              </li>
+            </ul>
+          </motion.div>
+        </div>
+      </div>
+    );
   }
 
   return (

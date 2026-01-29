@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import api from "@/api/apiClient";
 
 export function useVersionControl(resumeId, resumeData) {
   const [versions, setVersions] = useState([]);
   const [versionCount, setVersionCount] = useState(0);
   const [savingVersion, setSavingVersion] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (resumeId) {
@@ -45,7 +47,8 @@ export function useVersionControl(resumeId, resumeData) {
 
       setVersions([newVersion, ...versions]);
       setVersionCount(nextVersionNumber);
-      
+      queryClient.invalidateQueries({ queryKey: ['all-resume-versions'] });
+
       return newVersion;
     } catch (err) {
       console.error("Failed to save version:", err);
@@ -100,6 +103,7 @@ export function useVersionControl(resumeId, resumeData) {
       await api.entities.ResumeVersion.delete(versionId);
       setVersions(versions.filter(v => v.id !== versionId));
       setVersionCount(versionCount - 1);
+      queryClient.invalidateQueries({ queryKey: ['all-resume-versions'] });
       return true;
     } catch (err) {
       console.error("Failed to delete version:", err);

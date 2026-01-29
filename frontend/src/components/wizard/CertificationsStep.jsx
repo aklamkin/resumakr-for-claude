@@ -8,9 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, Award, FolderKanban, Languages } from "lucide-react";
 
 export default function CertificationsStep({ data, onChange }) {
-  const certifications = data.certifications || [];
-  const projects = data.projects || [];
-  const languages = data.languages || [];
+  // Ensure arrays are always arrays (handle corrupted data stored as objects)
+  const certifications = Array.isArray(data.certifications) ? data.certifications : [];
+  const projects = Array.isArray(data.projects) ? data.projects : [];
+  const languages = Array.isArray(data.languages) ? data.languages : [];
 
   const addCertification = () => {
     onChange({

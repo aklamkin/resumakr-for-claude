@@ -2,11 +2,13 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import api from "@/api/apiClient";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Loader2, Edit2, Save, X, Lock } from "lucide-react";
+import { ArrowLeft, Loader2, Edit2, Save, X, Lock, Download, Crown, Sparkles, Zap } from "lucide-react";
 import { motion } from "framer-motion";
+import { formatResumeDate } from "../components/utils/dateUtils";
 
 // Custom hooks
 import { useScrollPosition } from "../components/hooks/useScrollPosition";
@@ -32,6 +34,9 @@ export default function ResumeReview() {
   const navigate = useNavigate();
   const urlParams = new URLSearchParams(window.location.search);
   const resumeId = urlParams.get("id");
+
+  // Auth context for tier-based feature access
+  const { canAccessFeature, isPaid, aiCredits, loading: authLoading } = useAuth();
 
   // Custom hooks
   const {
@@ -64,11 +69,8 @@ export default function ResumeReview() {
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editedData, setEditedData] = useState(null);
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [checkingSubscription, setCheckingSubscription] = useState(true);
-
-  // AI Improvement hook
-  const aiHelpers = useAIImprovement(resumeData, setResumeData, providers, prompts);
+  const [pdfStatus, setPdfStatus] = useState(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   // Modals
   const [showDesignModal, setShowDesignModal] = useState(false);
@@ -87,10 +89,13 @@ export default function ResumeReview() {
     setNotification({ open: true, title, message, type });
   };
 
+  // AI Improvement hook (must come after showNotification is declared)
+  const aiHelpers = useAIImprovement(resumeData, setResumeData, providers, prompts, showNotification);
+
   useEffect(() => {
-    checkSubscription();
     loadProviders();
     loadPrompts();
+    loadPdfStatus();
   }, []);
 
   useEffect(() => {
@@ -103,34 +108,190 @@ export default function ResumeReview() {
     }
   }, [resumeData]);
 
-  const checkSubscription = async () => {
+  const loadPdfStatus = async () => {
     try {
-      const user = await api.auth.me();
-
-      // Check if subscription is active and not expired
-      if (user.is_subscribed && user.subscription_end_date) {
-        const endDate = new Date(user.subscription_end_date);
-        const now = new Date();
-        setIsSubscribed(endDate > now);
-
-        // If expired, update the user status
-        if (endDate <= now) {
-          await api.auth.updateMe({ is_subscribed: false });
-          setIsSubscribed(false);
-        }
-      } else {
-        setIsSubscribed(false);
-      }
+      const status = await api.exports.getPdfStatus();
+      setPdfStatus(status);
     } catch (err) {
-      console.error("Failed to check subscription:", err);
-      setIsSubscribed(false);
-    } finally {
-      setCheckingSubscription(false);
+      console.error("Failed to load PDF status:", err);
     }
   };
 
-  const handleSubscriptionRequired = () => {
+  const handleUpgradeClick = () => {
     navigate(createPageUrl(`Pricing?returnUrl=ResumeReview?id=${resumeId}`));
+  };
+
+  // Preserve scroll position across edit mode transitions
+  const withScrollPreserve = (fn) => {
+    const container = document.getElementById('main-scroll-container');
+    const scrollTop = container?.scrollTop || 0;
+    fn();
+    requestAnimationFrame(() => {
+      if (container) container.scrollTop = scrollTop;
+    });
+  };
+
+  const handleDownloadPdf = async () => {
+    if (downloadingPdf) return;
+
+    // Check if user can download
+    if (pdfStatus && pdfStatus.remaining <= 0 && !isPaid) {
+      showNotification(
+        "You've used your free PDF download this month. Upgrade for unlimited downloads!",
+        "Download Limit Reached",
+        "error"
+      );
+      return;
+    }
+
+    if (!resumeData) {
+      showNotification("Resume data not loaded.", "Error", "error");
+      return;
+    }
+
+    setDownloadingPdf(true);
+    try {
+      // Record the download with the API
+      await api.exports.recordPdfDownload();
+
+      // Generate and open print dialog
+      const personalInfo = resumeData.personal_info || {};
+      const htmlContent = generatePrintableHTML(resumeData, personalInfo, pdfStatus?.watermark);
+
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+
+      // Refresh PDF status
+      await loadPdfStatus();
+
+      const message = pdfStatus?.watermark
+        ? "Print dialog opened. Save as PDF. Note: Free tier PDFs include a watermark."
+        : "Print dialog opened. Save as PDF from the print options.";
+      showNotification(message, "Export to PDF");
+    } catch (err) {
+      console.error("PDF download error:", err);
+      if (err.response?.status === 403) {
+        showNotification(
+          "Download limit exceeded. Upgrade for unlimited downloads!",
+          "Limit Reached",
+          "error"
+        );
+      } else {
+        showNotification("Failed to generate PDF.", "Download Failed", "error");
+      }
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  // Generate printable HTML for PDF export
+  const generatePrintableHTML = (data, personalInfo, showWatermark) => {
+    const workExperience = data.work_experience || [];
+    const education = data.education || [];
+    const skills = data.skills || [];
+    const summary = data.professional_summary || '';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>${personalInfo.full_name || 'Resume'}</title>
+        <style>
+          @media print {
+            body { margin: 0; padding: 20px; }
+            .watermark { position: fixed; bottom: 20px; right: 20px; opacity: 0.3; font-size: 12px; color: #666; }
+          }
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; line-height: 1.6; color: #333; }
+          h1 { color: #1e40af; margin-bottom: 5px; font-size: 28px; }
+          h2 { color: #1e40af; border-bottom: 2px solid #1e40af; padding-bottom: 5px; margin-top: 25px; font-size: 18px; }
+          .contact { color: #666; margin-bottom: 20px; font-size: 14px; }
+          .contact a { color: #1e40af; text-decoration: none; }
+          .job, .edu { margin-bottom: 15px; }
+          .job-header, .edu-header { display: flex; justify-content: space-between; align-items: baseline; }
+          .job-title, .edu-degree { font-weight: bold; color: #1e3a5f; }
+          .company, .school { color: #4a5568; font-style: italic; }
+          .dates { color: #718096; font-size: 14px; }
+          .description { margin-top: 8px; }
+          ul { margin: 8px 0; padding-left: 20px; }
+          li { margin-bottom: 4px; }
+          .skills { display: flex; flex-wrap: wrap; gap: 8px; }
+          .skill { background: #e2e8f0; padding: 4px 12px; border-radius: 4px; font-size: 14px; }
+          .watermark { position: fixed; bottom: 20px; right: 20px; opacity: 0.4; font-size: 11px; color: #888; }
+        </style>
+      </head>
+      <body>
+        ${showWatermark ? '<div class="watermark">Created with Resumakr.us - Free Tier</div>' : ''}
+
+        <h1>${personalInfo.full_name || 'Your Name'}</h1>
+        <div class="contact">
+          ${personalInfo.email ? `<a href="mailto:${personalInfo.email}">${personalInfo.email}</a>` : ''}
+          ${personalInfo.phone ? ` | ${personalInfo.phone}` : ''}
+          ${personalInfo.location ? ` | ${personalInfo.location}` : ''}
+          ${personalInfo.linkedin ? ` | <a href="${personalInfo.linkedin}" target="_blank">LinkedIn</a>` : ''}
+        </div>
+
+        ${summary ? `<h2>Professional Summary</h2><p>${summary}</p>` : ''}
+
+        ${workExperience.length > 0 ? `
+          <h2>Work Experience</h2>
+          ${workExperience.map(job => `
+            <div class="job">
+              <div class="job-header">
+                <span class="job-title">${job.position || job.title || ''}</span>
+                <span class="dates">${formatResumeDate(job.start_date)} - ${job.current ? 'Present' : formatResumeDate(job.end_date) || 'Present'}</span>
+              </div>
+              <div class="company">${job.company || ''}</div>
+              ${job.description ? `<div class="description">${job.description}</div>` : ''}
+              ${job.achievements && job.achievements.length > 0 ? `
+                <ul>
+                  ${job.achievements.map(a => `<li>${a}</li>`).join('')}
+                </ul>
+              ` : ''}
+            </div>
+          `).join('')}
+        ` : ''}
+
+        ${education.length > 0 ? `
+          <h2>Education</h2>
+          ${education.map(edu => `
+            <div class="edu">
+              <div class="edu-header">
+                <span class="edu-degree">${edu.degree || ''}</span>
+                <span class="dates">${formatResumeDate(edu.graduation_date) || formatResumeDate(edu.end_date) || ''}</span>
+              </div>
+              <div class="school">${edu.institution || edu.school || ''}</div>
+              ${edu.gpa ? `<div>GPA: ${edu.gpa}</div>` : ''}
+            </div>
+          `).join('')}
+        ` : ''}
+
+        ${skills.length > 0 ? `
+          <h2>Skills</h2>
+          ${skills.map(skill => {
+            if (typeof skill === 'string') {
+              return `<div class="skills"><span class="skill">${skill}</span></div>`;
+            }
+            if (skill.category && skill.items?.length > 0) {
+              return `<div style="margin-bottom: 8px;">
+                <strong style="color: #1e3a5f;">${skill.category}:</strong>
+                <span style="margin-left: 6px;">${skill.items.join(', ')}</span>
+              </div>`;
+            }
+            if (skill.name) {
+              return `<div class="skills"><span class="skill">${skill.name}</span></div>`;
+            }
+            return '';
+          }).join('')}
+        ` : ''}
+      </body>
+      </html>
+    `;
   };
 
   const loadProviders = async () => {
@@ -202,8 +363,13 @@ export default function ResumeReview() {
       return;
     }
 
-    if (!isSubscribed) {
-      handleSubscriptionRequired();
+    // Check if user has AI credits remaining (free users get 5 total)
+    if (!isPaid && aiCredits && aiCredits.remaining <= 0) {
+      showNotification(
+        "You've used all your free AI credits. Upgrade for unlimited AI features!",
+        "AI Credits Exhausted",
+        "error"
+      );
       return;
     }
 
@@ -337,17 +503,23 @@ export default function ResumeReview() {
       await api.entities.ResumeData.update(resumeData.id, updatedData);
       setResumeData(updatedData);
 
-      // Pass updatedData directly to saveVersion to avoid stale state
-      const newVersion = await saveVersion(
-        `${templateName} Template`, 
-        `Resume styled with ${templateName} template`,
-        updatedData
-      );
+      // Only create version if user has access to version history (paid feature)
+      if (canAccessFeature('versionHistory')) {
+        const newVersion = await saveVersion(
+          `${templateName} Template`,
+          `Resume styled with ${templateName} template`,
+          updatedData
+        );
 
-      if (newVersion) {
-        showNotification(`Template version saved as Version ${newVersion.version_number}!`, "Version Saved");
+        if (newVersion) {
+          showNotification(`Template saved as Version ${newVersion.version_number}!`, "Template Applied");
+        } else {
+          // Version creation failed but template was saved
+          showNotification(`${templateName} template applied!`, "Template Applied");
+        }
       } else {
-        showNotification("Failed to save template version.", "Error", "error");
+        // Free user - template saved without version
+        showNotification(`${templateName} template applied to your resume!`, "Template Applied");
       }
 
       setShowDesignModal(false);
@@ -358,12 +530,12 @@ export default function ResumeReview() {
     }
   };
 
-  if (loading || checkingSubscription) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 flex items-center justify-center transition-colors duration-300">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-indigo-600 dark:text-indigo-400 animate-spin mx-auto mb-4" />
-          <p className="text-slate-600 dark:text-slate-300">{checkingSubscription ? "Checking subscription..." : "Loading your resume..."}</p>
+          <p className="text-slate-600 dark:text-slate-300">Loading your resume...</p>
         </div>
       </div>);
 
@@ -404,34 +576,36 @@ export default function ResumeReview() {
             Back to My Resumes
           </Button>
 
-          {/* Subscription Warning Banner */}
-          {!isSubscribed &&
-          <Card className="p-4 mb-6 bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-300 dark:border-yellow-700">
-              <div className="flex items-center justify-between gap-4">
+          {/* Free tier info banner - shows what free users can do */}
+          {!isPaid && (
+            <Card className="p-4 mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border border-indigo-200 dark:border-indigo-700">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
-                  <Lock className="w-5 h-5 text-yellow-700 dark:text-yellow-400" />
+                  <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                   <div>
-                    <p className="font-semibold text-yellow-900 dark:text-yellow-200">Subscription Required</p>
-                    <p className="text-sm text-yellow-800 dark:text-yellow-300">Subscribe to edit and use AI features.</p>
+                    <p className="font-semibold text-indigo-900 dark:text-indigo-200">Free Plan</p>
+                    <div className="text-sm text-indigo-700 dark:text-indigo-300 space-y-1">
+                      <p>✓ View resume &nbsp; ✓ PDF credits: {pdfStatus?.remaining ?? 5}/{pdfStatus?.limit ?? 5}{pdfStatus?.watermark ? ' (with watermark)' : ''}</p>
+                      <p className="flex items-center gap-1">
+                        <Zap className="w-3 h-3" /> AI Credits: {aiCredits?.remaining ?? 5}/{aiCredits?.total ?? 5} remaining
+                      </p>
+                    </div>
                   </div>
                 </div>
                 <Button
-                onClick={handleSubscriptionRequired}
-                className="bg-yellow-600 hover:bg-yellow-700 dark:bg-yellow-500 dark:hover:bg-yellow-600 text-white">
-
-                  Subscribe Now
+                  onClick={handleUpgradeClick}
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                >
+                  <Crown className="w-4 h-4 mr-2" />
+                  Upgrade for More
                 </Button>
               </div>
             </Card>
-          }
+          )}
 
           <ResumeHeader
             title={resume.title}
             onSave={async (newTitle) => {
-              if (!isSubscribed) {
-                handleSubscriptionRequired();
-                return false;
-              }
               const success = await updateResumeTitle(newTitle);
               if (success) {
                 showNotification("Title updated successfully!", "Title Saved");
@@ -443,20 +617,20 @@ export default function ResumeReview() {
             editMode={editMode} />
 
 
-          {!editMode &&
           <ATSAnalysisCard
             jobDescription={jobDescription}
             onJobDescriptionChange={handleJobDescriptionChange}
             onJobDescriptionBlur={handleJobDescriptionBlur}
-            onAnalyze={isSubscribed ? analyzeATS : handleSubscriptionRequired}
+            onAnalyze={analyzeATS}
             analyzing={analyzingATS}
             saving={saving}
             atsResults={atsResults}
             showResults={showAtsResults}
             onToggleResults={() => setShowAtsResults(!showAtsResults)}
-            isSubscribed={isSubscribed} />
-
-          }
+            isSubscribed={true}
+            aiCredits={aiCredits}
+            isPaid={isPaid}
+          />
         </motion.div>
 
         <ActionButtonsBar
@@ -465,138 +639,76 @@ export default function ResumeReview() {
           savingVersion={savingVersion}
           jobDescription={jobDescription}
           hasCoverLetter={!!(resumeData?.cover_letter_short || resumeData?.cover_letter_long)}
-          onVersionsClick={isSubscribed ? () => setShowVersionModal(true) : handleSubscriptionRequired}
-          onSaveVersion={isSubscribed ? handleSaveVersion : handleSubscriptionRequired}
-          onCoverLetterClick={isSubscribed ? () => setShowCoverLetterModal(true) : handleSubscriptionRequired}
-          onDesignClick={isSubscribed ? () => setShowDesignModal(true) : handleSubscriptionRequired}
-          isSubscribed={isSubscribed} />
+          onVersionsClick={canAccessFeature('versionHistory') ? () => setShowVersionModal(true) : handleUpgradeClick}
+          onSaveVersion={canAccessFeature('versionHistory') ? handleSaveVersion : handleUpgradeClick}
+          onCoverLetterClick={canAccessFeature('coverLetters') ? () => setShowCoverLetterModal(true) : handleUpgradeClick}
+          onDesignClick={() => setShowDesignModal(true)}
+          onDownloadPdf={handleDownloadPdf}
+          downloadingPdf={downloadingPdf}
+          pdfStatus={pdfStatus}
+          isPaid={isPaid}
+          canAccessVersionHistory={canAccessFeature('versionHistory')}
+          canAccessCoverLetters={canAccessFeature('coverLetters')} />
 
 
         {/* Fixed Edit/Save buttons when scrolled */}
-        {isEditButtonFixed &&
-        <div
-          className="fixed z-40 transition-all duration-200"
-          style={{
-            top: '80px',
-            right: `${editButtonRightOffset + 24}px`
-          }}>
-
-            {!editMode ?
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (!isSubscribed) {
-                handleSubscriptionRequired();
-                return;
-              }
-              setEditedData(JSON.parse(JSON.stringify(resumeData)));
-              setEditMode(true);
+        {isEditButtonFixed && (
+          <div
+            className="fixed z-40 transition-all duration-200"
+            style={{
+              top: '80px',
+              right: `${editButtonRightOffset + 24}px`
             }}
-            className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 shadow-lg text-slate-900 dark:text-slate-100"
-            disabled={!isSubscribed}>
-
+          >
+            {!editMode ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (!isPaid) {
+                    handleUpgradeClick();
+                    return;
+                  }
+                  withScrollPreserve(() => {
+                    setEditedData(JSON.parse(JSON.stringify(resumeData)));
+                    setEditMode(true);
+                  });
+                }}
+                className={`shadow-lg ${
+                  isPaid
+                    ? "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100"
+                    : "bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400"
+                }`}
+                title={!isPaid ? "Premium feature - Upgrade to edit data" : "Edit resume data"}
+              >
+                {!isPaid && <Lock className="w-3 h-3 mr-1.5" />}
                 <Edit2 className="w-4 h-4 mr-2" />
                 Edit Data
-              </Button> :
-
-          <div className="flex gap-2">
+                {!isPaid && <Crown className="w-3 h-3 ml-1.5 text-amber-500" />}
+              </Button>
+            ) : (
+              <div className="flex gap-2">
                 <Button
-              variant="outline"
-              onClick={() => {
-                setEditMode(false);
-                setEditedData(null);
-              }}
-              className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 shadow-lg text-slate-900 dark:text-slate-100">
-
+                  variant="outline"
+                  onClick={() => {
+                    withScrollPreserve(() => {
+                      setEditMode(false);
+                      setEditedData(null);
+                    });
+                  }}
+                  className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 shadow-lg text-slate-900 dark:text-slate-100"
+                >
                   <X className="w-4 h-4 mr-2" />
                   Cancel
                 </Button>
                 <Button
-              onClick={async () => {
-                setSaving(true);
-                try {
-                  await api.entities.ResumeData.update(resumeData.id, editedData);
-                  setResumeData(editedData);
-                  setEditMode(false);
-                  showNotification("Changes saved successfully!", "Saved");
-                } catch (err) {
-                  showNotification("Failed to save changes.", "Error", "error");
-                } finally {
-                  setSaving(false);
-                }
-              }}
-              disabled={saving}
-              className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 shadow-lg">
-
-                  {saving ?
-              <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </> :
-
-              <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save
-                    </>
-              }
-                </Button>
-              </div>
-          }
-          </div>
-        }
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="relative">
-
-          <Card id="resume-card" className={`p-12 border-2 shadow-lg bg-white dark:bg-slate-800 ${
-          !isSubscribed ? "opacity-75 border-yellow-300 dark:border-yellow-700" : "border-slate-200 dark:border-slate-700"}`
-          }>
-            {/* Edit Data / Save & Cancel buttons */}
-            <div
-              id="edit-button-container"
-              className="absolute top-6 right-6"
-              style={{ visibility: isEditButtonFixed ? 'hidden' : 'visible' }}>
-
-              {!editMode ?
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (!isSubscribed) {
-                    handleSubscriptionRequired();
-                    return;
-                  }
-                  setEditedData(JSON.parse(JSON.stringify(resumeData)));
-                  setEditMode(true);
-                }}
-                className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 shadow-lg text-slate-900 dark:text-slate-100"
-                disabled={!isSubscribed}>
-
-                  <Edit2 className="w-4 h-4 mr-2" />
-                  Edit Data
-                </Button> :
-
-              <div className="flex gap-2">
-                  <Button
-                  variant="outline"
-                  onClick={() => {
-                    setEditMode(false);
-                    setEditedData(null);
-                  }}
-                  className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 shadow-lg text-slate-900 dark:text-slate-100">
-
-                    <X className="w-4 h-4 mr-2" />
-                    Cancel
-                  </Button>
-                  <Button
                   onClick={async () => {
                     setSaving(true);
                     try {
                       await api.entities.ResumeData.update(resumeData.id, editedData);
-                      setResumeData(editedData);
-                      setEditMode(false);
+                      withScrollPreserve(() => {
+                        setResumeData(editedData);
+                        setEditMode(false);
+                      });
                       showNotification("Changes saved successfully!", "Saved");
                     } catch (err) {
                       showNotification("Failed to save changes.", "Error", "error");
@@ -605,22 +717,111 @@ export default function ResumeReview() {
                     }
                   }}
                   disabled={saving}
-                  className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 shadow-lg">
+                  className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 shadow-lg"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
 
-                    {saving ?
-                  <>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="relative">
+
+          <Card id="resume-card" className="p-12 border-2 shadow-lg bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+            {/* Edit Data / Save & Cancel buttons */}
+            <div
+              id="edit-button-container"
+              className="absolute top-6 right-6"
+              style={{ visibility: isEditButtonFixed ? 'hidden' : 'visible' }}
+            >
+              {!editMode ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (!isPaid) {
+                      handleUpgradeClick();
+                      return;
+                    }
+                    withScrollPreserve(() => {
+                      setEditedData(JSON.parse(JSON.stringify(resumeData)));
+                      setEditMode(true);
+                    });
+                  }}
+                  className={`shadow-lg ${
+                    isPaid
+                      ? "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100"
+                      : "bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400"
+                  }`}
+                  title={!isPaid ? "Premium feature - Upgrade to edit data" : "Edit resume data"}
+                >
+                  {!isPaid && <Lock className="w-3 h-3 mr-1.5" />}
+                  <Edit2 className="w-4 h-4 mr-2" />
+                  Edit Data
+                  {!isPaid && <Crown className="w-3 h-3 ml-1.5 text-amber-500" />}
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      withScrollPreserve(() => {
+                        setEditMode(false);
+                        setEditedData(null);
+                      });
+                    }}
+                    className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 shadow-lg text-slate-900 dark:text-slate-100"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      setSaving(true);
+                      try {
+                        await api.entities.ResumeData.update(resumeData.id, editedData);
+                        withScrollPreserve(() => {
+                          setResumeData(editedData);
+                          setEditMode(false);
+                        });
+                        showNotification("Changes saved successfully!", "Saved");
+                      } catch (err) {
+                        showNotification("Failed to save changes.", "Error", "error");
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                    disabled={saving}
+                    className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 shadow-lg"
+                  >
+                    {saving ? (
+                      <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         Saving...
-                      </> :
-
-                  <>
+                      </>
+                    ) : (
+                      <>
                         <Save className="w-4 h-4 mr-2" />
                         Save
                       </>
-                  }
+                    )}
                   </Button>
                 </div>
-              }
+              )}
             </div>
 
             <div className="space-y-8">
@@ -643,9 +844,11 @@ export default function ResumeReview() {
                   }
                 }}
                 aiHelpers={{ ...aiHelpers, providers }}
-                isSubscribed={isSubscribed}
-                onSubscriptionRequired={handleSubscriptionRequired}
-                atsResults={atsResults} />
+                isSubscribed={isPaid || (aiCredits?.remaining > 0)}
+                onSubscriptionRequired={handleUpgradeClick}
+                atsResults={atsResults}
+                aiCredits={aiCredits}
+                isPaid={isPaid} />
 
 
               <WorkExperienceSection
@@ -657,9 +860,11 @@ export default function ResumeReview() {
                   }
                 }}
                 aiHelpers={{ ...aiHelpers, providers }}
-                isSubscribed={isSubscribed}
-                onSubscriptionRequired={handleSubscriptionRequired}
-                atsResults={atsResults} />
+                isSubscribed={isPaid || (aiCredits?.remaining > 0)}
+                onSubscriptionRequired={handleUpgradeClick}
+                atsResults={atsResults}
+                aiCredits={aiCredits}
+                isPaid={isPaid} />
 
 
               <EducationSection
@@ -681,9 +886,11 @@ export default function ResumeReview() {
                   }
                 }}
                 aiHelpers={{ ...aiHelpers, providers }}
-                isSubscribed={isSubscribed}
-                onSubscriptionRequired={handleSubscriptionRequired}
-                atsResults={atsResults} />
+                isSubscribed={isPaid || (aiCredits?.remaining > 0)}
+                onSubscriptionRequired={handleUpgradeClick}
+                atsResults={atsResults}
+                aiCredits={aiCredits}
+                isPaid={isPaid} />
 
             </div>
           </Card>
@@ -704,7 +911,8 @@ export default function ResumeReview() {
         open={showDesignModal}
         onClose={() => setShowDesignModal(false)}
         resumeData={resumeData}
-        onSaveTemplate={handleSaveTemplate} />
+        onSaveTemplate={handleSaveTemplate}
+        isPremiumUser={isPaid} />
 
 
       <CoverLetterModal

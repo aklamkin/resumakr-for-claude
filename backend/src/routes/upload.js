@@ -6,8 +6,9 @@ import { fileURLToPath } from 'url';
 import pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
 import { query } from '../config/database.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, requireFeature } from '../middleware/auth.js';
 import { getAIClient, callAI } from './ai.js';
+import { buildPrompt } from '../utils/promptLoader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,10 +127,10 @@ function normalizeDate(dateStr) {
       return `${mmyyyyMatch[2]}-${month}`;
     }
 
-    // Handle just year "YYYY"
+    // Handle just year "YYYY" - preserve as year-only, don't add default month
     const yearMatch = dateStr.match(/^(\d{4})$/);
     if (yearMatch) {
-      return `${yearMatch[1]}-01`;
+      return yearMatch[1]; // Return just the year, no fake month
     }
 
     return dateStr; // Return as-is if can't parse
@@ -243,7 +244,8 @@ function cleanAndValidateData(extractedData) {
   return cleaned;
 }
 
-router.post('/extract', async (req, res) => {
+// Resume parsing (AI extraction) is a paid feature
+router.post('/extract', requireFeature('resumeParsing'), async (req, res) => {
   try {
     const { file_url } = req.body;
     if (!file_url) {
@@ -302,146 +304,8 @@ router.post('/extract', async (req, res) => {
       });
     }
 
-    // Enhanced prompt for better JSON generation with detailed instructions
-    const prompt = `You are a professional resume parser. Your task is to extract ALL information from this resume with extreme accuracy and attention to detail.
-
-===== RESUME TEXT =====
-${extractedText}
-=======================
-
-EXTRACTION INSTRUCTIONS:
-
-1. PERSONAL INFORMATION:
-   - Extract: full_name, email, phone, location, linkedin, website, github
-   - For LinkedIn/website/github: extract full URLs if present, or just usernames
-   - Location: City, State format preferred
-
-2. PROFESSIONAL SUMMARY:
-   - Extract the complete professional summary/objective section
-   - If multiple paragraphs, combine them with proper spacing
-   - Do NOT summarize - extract verbatim
-
-3. WORK EXPERIENCE (CRITICAL - BE THOROUGH):
-   - Extract EVERY job position, even if briefly mentioned
-   - For EACH position extract:
-     * company: Company name exactly as written
-     * position: Job title exactly as written
-     * location: City, State if available
-     * start_date: Convert to "Month Year" format (e.g., "January 2020", "Jan 2020")
-     * end_date: Convert to "Month Year" format, or leave empty if current
-     * current: true if currently working there, false otherwise
-     * responsibilities: Extract EVERY bullet point as separate array item
-   - For responsibilities:
-     * Each bullet point is a separate string in the array
-     * Remove bullet characters (•, -, *) but keep the full text
-     * Preserve exact wording - do NOT paraphrase or shorten
-     * Include metrics, percentages, numbers exactly as shown
-
-4. EDUCATION:
-   - Extract EVERY degree/certification program
-   - For EACH education entry extract:
-     * institution: School/University name exactly as written
-     * degree: Full degree name (e.g., "Bachelor of Science")
-     * field_of_study: Major/field (e.g., "Computer Science")
-     * location: City, State if available
-     * graduation_date: Month and Year if available
-     * gpa: If mentioned
-     * honors: Dean's List, Summa Cum Laude, etc. if mentioned
-
-5. SKILLS:
-   - Group skills by category (e.g., "Technical Skills", "Languages", "Tools")
-   - For EACH category extract:
-     * category: The category name
-     * items: Array of individual skills
-   - Split comma-separated skills into array items
-   - Extract ALL skills mentioned, don't skip any
-
-6. CERTIFICATIONS:
-   - Extract EVERY certification with name, issuer, dates if available
-
-7. PROJECTS:
-   - Extract personal/professional projects with descriptions and technologies
-
-8. LANGUAGES:
-   - Extract spoken languages and proficiency levels
-
-CRITICAL FORMAT REQUIREMENTS:
-- Return ONLY valid JSON, no markdown, no code blocks, no explanations
-- Use double quotes for all strings
-- Use empty strings "" for missing data, NEVER null
-- Dates: Use "Month Year" format (e.g., "January 2020", "Jan 2020")
-- Arrays: Each item properly separated by commas
-- Ensure all brackets and braces are properly closed
-- Escape special characters in strings
-
-JSON STRUCTURE TO RETURN:
-{
-  "personal_info": {
-    "full_name": "",
-    "email": "",
-    "phone": "",
-    "location": "",
-    "linkedin": "",
-    "website": "",
-    "github": ""
-  },
-  "professional_summary": "",
-  "work_experience": [
-    {
-      "company": "",
-      "position": "",
-      "location": "",
-      "start_date": "Month Year",
-      "end_date": "Month Year",
-      "current": false,
-      "responsibilities": ["responsibility 1", "responsibility 2"]
-    }
-  ],
-  "education": [
-    {
-      "institution": "",
-      "degree": "",
-      "field_of_study": "",
-      "location": "",
-      "graduation_date": "Month Year",
-      "gpa": "",
-      "honors": ""
-    }
-  ],
-  "skills": [
-    {
-      "category": "Category Name",
-      "items": ["skill1", "skill2", "skill3"]
-    }
-  ],
-  "certifications": [
-    {
-      "name": "",
-      "issuer": "",
-      "date_obtained": "",
-      "expiry_date": "",
-      "credential_id": ""
-    }
-  ],
-  "projects": [
-    {
-      "name": "",
-      "description": "",
-      "technologies": ["tech1", "tech2"],
-      "url": ""
-    }
-  ],
-  "languages": [
-    {
-      "language": "",
-      "proficiency": ""
-    }
-  ]
-}
-
-BE EXTREMELY THOROUGH. Extract EVERYTHING. Do NOT skip or summarize ANY information.`.trim();
-
-    const systemPrompt = 'You are a JSON-only output system. Return ONLY valid, parseable JSON with no markdown, no code blocks, no explanations. Every field must be filled with either extracted data or an empty string/array.';
+    // Load prompt from database (admin-configurable)
+    const { systemPrompt, userPrompt: prompt } = await buildPrompt('resume_parsing', { resume_text: extractedText });
 
     // Determine models to try based on provider type
     let modelsToTry = [];

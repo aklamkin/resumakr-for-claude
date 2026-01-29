@@ -1,16 +1,6 @@
 import React from "react";
-import { format } from "date-fns";
 import { Mail, Phone, MapPin } from "lucide-react";
-
-const formatDate = (dateString) => {
-  if (!dateString) return '';
-  try {
-    const date = new Date(dateString + '-01');
-    return format(date, 'MMM yyyy');
-  } catch (err) {
-    return dateString;
-  }
-};
+import { formatResumeDate } from "../utils/dateUtils";
 
 // Font mapping - simplified to 5 reliable web-safe fonts
 const getFontFamily = (fontValue) => {
@@ -86,7 +76,7 @@ const ClassicProfessionalTemplate = ({ data, customColors = {}, customFonts = {}
                     <p className="text-sm italic" style={{ opacity: 0.85, fontFamily }}>{exp.company}</p>
                   </div>
                   <div className="text-right text-sm" style={{ opacity: 0.7, fontFamily }}>
-                    <p>{formatDate(exp.start_date)} - {exp.current ? "Present" : formatDate(exp.end_date)}</p>
+                    <p>{formatResumeDate(exp.start_date)} - {exp.current ? "Present" : formatResumeDate(exp.end_date)}</p>
                     {exp.location && <p>{exp.location}</p>}
                   </div>
                 </div>
@@ -112,7 +102,7 @@ const ClassicProfessionalTemplate = ({ data, customColors = {}, customFonts = {}
                     {edu.field_of_study && <p className="text-sm" style={{ opacity: 0.85, fontFamily }}>{edu.field_of_study}</p>}
                   </div>
                   <div className="text-right text-sm" style={{ opacity: 0.7, fontFamily }}>
-                    {edu.graduation_date && <p>{formatDate(edu.graduation_date)}</p>}
+                    {edu.graduation_date && <p>{formatResumeDate(edu.graduation_date)}</p>}
                     {edu.location && <p>{edu.location}</p>}
                   </div>
                 </div>
@@ -217,7 +207,7 @@ const ModernMinimalistTemplate = ({ data, customColors = {}, customFonts = {} })
                     <h3 className="text-sm font-bold" style={{ color: textColor, fontFamily }}>{exp.position}</h3>
                     <div className="flex justify-between items-center text-xs" style={{ color: defaultText, fontFamily }}>
                       <span className="font-semibold">{exp.company}</span>
-                      <span>{formatDate(exp.start_date)} - {exp.current ? "Present" : formatDate(exp.end_date)}</span>
+                      <span>{formatResumeDate(exp.start_date)} - {exp.current ? "Present" : formatResumeDate(exp.end_date)}</span>
                     </div>
                   </div>
                   {exp.responsibilities && exp.responsibilities.length > 0 && (
@@ -238,7 +228,7 @@ const ModernMinimalistTemplate = ({ data, customColors = {}, customFonts = {} })
                   <h3 className="text-sm font-bold" style={{ color: textColor, fontFamily }}>{edu.degree}</h3>
                   <div className="flex justify-between items-center text-xs" style={{ color: defaultText, fontFamily }}>
                     <span className="font-semibold">{edu.institution}</span>
-                    {edu.graduation_date && <span>{formatDate(edu.graduation_date)}</span>}
+                    {edu.graduation_date && <span>{formatResumeDate(edu.graduation_date)}</span>}
                   </div>
                 </div>
               ))}
@@ -301,7 +291,7 @@ const CreativeBoldTemplate = ({ data, customColors = {}, customFonts = {} }) => 
                       <p className="text-xs font-semibold" style={{ color: secondaryTextColor, fontFamily }}>{exp.company}</p>
                     </div>
                     <div className="text-xs text-right" style={{ color: secondaryTextColor, opacity: 0.8, fontFamily }}>
-                      <p>{formatDate(exp.start_date)} - {exp.current ? "Present" : formatDate(exp.end_date)}</p>
+                      <p>{formatResumeDate(exp.start_date)} - {exp.current ? "Present" : formatResumeDate(exp.end_date)}</p>
                       {exp.location && <p style={{ opacity: 0.7 }}>{exp.location}</p>}
                     </div>
                   </div>
@@ -335,7 +325,7 @@ const CreativeBoldTemplate = ({ data, customColors = {}, customFonts = {} }) => 
                       {edu.field_of_study && <p className="text-xs" style={{ color: secondaryTextColor, opacity: 0.8, fontFamily }}>{edu.field_of_study}</p>}
                     </div>
                     <div className="text-xs text-right" style={{ color: secondaryTextColor, opacity: 0.8, fontFamily }}>
-                      {edu.graduation_date && <p>{formatDate(edu.graduation_date)}</p>}
+                      {edu.graduation_date && <p>{formatResumeDate(edu.graduation_date)}</p>}
                       {edu.location && <p style={{ opacity: 0.7 }}>{edu.location}</p>}
                     </div>
                   </div>
@@ -411,7 +401,7 @@ const ExecutiveElegantTemplate = ({ data, customColors = {}, customFonts = {} })
                     <p className="text-sm" style={{ fontFamily }}>{exp.company}{exp.location && ` • ${exp.location}`}</p>
                   </div>
                   <div className="text-right text-sm whitespace-nowrap ml-4" style={{ fontFamily }}>
-                    {formatDate(exp.start_date)} – {exp.current ? "Present" : formatDate(exp.end_date)}
+                    {formatResumeDate(exp.start_date)} – {exp.current ? "Present" : formatResumeDate(exp.end_date)}
                   </div>
                 </div>
                 {exp.responsibilities && exp.responsibilities.length > 0 && (
@@ -441,7 +431,7 @@ const ExecutiveElegantTemplate = ({ data, customColors = {}, customFonts = {} })
                     {edu.field_of_study && <p className="text-sm" style={{ fontFamily }}>{edu.field_of_study}</p>}
                   </div>
                   <div className="text-right text-sm whitespace-nowrap ml-4" style={{ fontFamily }}>
-                    {edu.graduation_date && formatDate(edu.graduation_date)}
+                    {edu.graduation_date && formatResumeDate(edu.graduation_date)}
                   </div>
                 </div>
               </div>
@@ -516,7 +506,7 @@ const TechSleekTemplate = ({ data, customColors = {}, customFonts = {} }) => {
                       <p className="text-xs" style={{ color: itemTextColor, fontFamily }}>{exp.company}</p>
                     </div>
                     <div className="text-right text-xs" style={{ color: itemTextColor, opacity: 0.7, fontFamily }}>
-                      <p>{formatDate(exp.start_date)} → {exp.current ? "Now" : formatDate(exp.end_date)}</p>
+                      <p>{formatResumeDate(exp.start_date)} → {exp.current ? "Now" : formatResumeDate(exp.end_date)}</p>
                     </div>
                   </div>
                   {exp.responsibilities && exp.responsibilities.length > 0 && (
@@ -542,7 +532,7 @@ const TechSleekTemplate = ({ data, customColors = {}, customFonts = {} }) => {
                   <div key={idx} className="mb-3 rounded p-2" style={{ border: `1px solid ${accentColor}40`, backgroundColor: `${itemBgColor}80` }}>
                     <h3 className="text-xs font-bold" style={{ color: itemTitleColor, fontFamily }}>{edu.degree}</h3>
                     <p className="text-xs" style={{ color: itemTextColor, fontFamily }}>{edu.institution}</p>
-                    {edu.graduation_date && <p className="text-xs" style={{ color: itemTextColor, opacity: 0.7, fontFamily }}>{formatDate(edu.graduation_date)}</p>}
+                    {edu.graduation_date && <p className="text-xs" style={{ color: itemTextColor, opacity: 0.7, fontFamily }}>{formatResumeDate(edu.graduation_date)}</p>}
                   </div>
                 ))}
               </div>
@@ -614,7 +604,7 @@ const ProfessionalColumnsTemplate = ({ data, customColors = {}, customFonts = {}
                       <h3 className="text-sm font-bold" style={{ color: primaryColor, fontFamily }}>{exp.position}</h3>
                       <div className="flex justify-between items-center text-xs" style={{ fontFamily }}>
                         <span className="font-semibold" style={{ color: textColor }}>{exp.company}</span>
-                        <span style={{ color: textColor, opacity: 0.7 }}>{formatDate(exp.start_date)} - {exp.current ? "Present" : formatDate(exp.end_date)}</span>
+                        <span style={{ color: textColor, opacity: 0.7 }}>{formatResumeDate(exp.start_date)} - {exp.current ? "Present" : formatResumeDate(exp.end_date)}</span>
                       </div>
                     </div>
                     {exp.responsibilities && exp.responsibilities.length > 0 && (
@@ -636,7 +626,7 @@ const ProfessionalColumnsTemplate = ({ data, customColors = {}, customFonts = {}
                   <div key={idx} className="mb-4">
                     <h3 className="text-xs font-bold" style={{ color: primaryColor, fontFamily }}>{edu.degree}</h3>
                     <p className="text-xs" style={{ color: textColor, fontFamily }}>{edu.institution}</p>
-                    {edu.graduation_date && <p className="text-xs" style={{ color: textColor, opacity: 0.7, fontFamily }}>{formatDate(edu.graduation_date)}</p>}
+                    {edu.graduation_date && <p className="text-xs" style={{ color: textColor, opacity: 0.7, fontFamily }}>{formatResumeDate(edu.graduation_date)}</p>}
                   </div>
                 ))}
               </div>
@@ -706,7 +696,7 @@ const ProfessionalCompactTemplate = ({ data, customColors = {}, customFonts = {}
                     <p className="text-xs" style={{ color: textColor, fontFamily }}>{exp.company}</p>
                   </div>
                   <div className="text-right text-xs" style={{ color: textColor, fontFamily }}>
-                    <p>{formatDate(exp.start_date)} - {exp.current ? "Present" : formatDate(exp.end_date)}</p>
+                    <p>{formatResumeDate(exp.start_date)} - {exp.current ? "Present" : formatResumeDate(exp.end_date)}</p>
                   </div>
                 </div>
                 {exp.responsibilities && exp.responsibilities.length > 0 && (
@@ -730,7 +720,7 @@ const ProfessionalCompactTemplate = ({ data, customColors = {}, customFonts = {}
                     <p className="text-xs" style={{ color: textColor, fontFamily }}>{edu.institution}</p>
                   </div>
                   <div className="text-xs" style={{ color: textColor, fontFamily }}>
-                    {edu.graduation_date && formatDate(edu.graduation_date)}
+                    {edu.graduation_date && formatResumeDate(edu.graduation_date)}
                   </div>
                 </div>
               </div>
@@ -801,7 +791,7 @@ const ModernProfessionalTemplate = ({ data, customColors = {}, customFonts = {} 
                       <p className="text-xs font-semibold" style={{ color: textColor, fontFamily }}>{exp.company}</p>
                     </div>
                     <div className="text-right text-xs" style={{ color: textColor, opacity: 0.8, fontFamily }}>
-                      <p>{formatDate(exp.start_date)} - {exp.current ? "Present" : formatDate(exp.end_date)}</p>
+                      <p>{formatResumeDate(exp.start_date)} - {exp.current ? "Present" : formatResumeDate(exp.end_date)}</p>
                     </div>
                   </div>
                   {exp.responsibilities && exp.responsibilities.length > 0 && (
@@ -825,7 +815,7 @@ const ModernProfessionalTemplate = ({ data, customColors = {}, customFonts = {} 
                       <p className="text-xs" style={{ color: textColor, fontFamily }}>{edu.institution}</p>
                     </div>
                     <div className="text-xs" style={{ color: textColor, opacity: 0.8, fontFamily }}>
-                      {edu.graduation_date && formatDate(edu.graduation_date)}
+                      {edu.graduation_date && formatResumeDate(edu.graduation_date)}
                     </div>
                   </div>
                 </div>
@@ -898,7 +888,7 @@ const CleanFormalTemplate = ({ data, customColors = {}, customFonts = {} }) => {
                     <p className="text-sm italic" style={{ color: textColor, fontFamily }}>{exp.company}</p>
                   </div>
                   <div className="text-right text-sm" style={{ color: textColor, fontFamily }}>
-                    {formatDate(exp.start_date)} – {exp.current ? "Present" : formatDate(exp.end_date)}
+                    {formatResumeDate(exp.start_date)} – {exp.current ? "Present" : formatResumeDate(exp.end_date)}
                   </div>
                 </div>
                 {exp.responsibilities && exp.responsibilities.length > 0 && (
@@ -922,7 +912,7 @@ const CleanFormalTemplate = ({ data, customColors = {}, customFonts = {} }) => {
                     <p className="text-sm italic" style={{ color: textColor, fontFamily }}>{edu.institution}</p>
                   </div>
                   <div className="text-sm" style={{ color: textColor, fontFamily }}>
-                    {edu.graduation_date && formatDate(edu.graduation_date)}
+                    {edu.graduation_date && formatResumeDate(edu.graduation_date)}
                   </div>
                 </div>
               </div>
@@ -1000,7 +990,7 @@ const ArtisticModernTemplate = ({ data, customColors = {}, customFonts = {} }) =
                       <h3 className="text-sm font-bold" style={{ color: primaryTextColor, fontFamily }}>{exp.position}</h3>
                       <div className="flex justify-between items-center text-xs" style={{ fontFamily }}>
                         <span className="font-semibold" style={{ color: accentColor }}>{exp.company}</span>
-                        <span style={{ color: secondaryTextColor }}>{formatDate(exp.start_date)} - {exp.current ? "Present" : formatDate(exp.end_date)}</span>
+                        <span style={{ color: secondaryTextColor }}>{formatResumeDate(exp.start_date)} - {exp.current ? "Present" : formatResumeDate(exp.end_date)}</span>
                       </div>
                     </div>
                     {exp.responsibilities && exp.responsibilities.length > 0 && (
@@ -1027,7 +1017,7 @@ const ArtisticModernTemplate = ({ data, customColors = {}, customFonts = {} }) =
                   <div key={idx} className="mb-3 rounded-xl p-3 shadow-md" style={{ backgroundColor: `#ffffff${shadowBgOpacity}` }}>
                     <h3 className="text-sm font-bold" style={{ color: primaryTextColor, fontFamily }}>{edu.degree}</h3>
                     <p className="text-xs font-semibold" style={{ color: accentColor, fontFamily }}>{edu.institution}</p>
-                    {edu.graduation_date && <p className="text-xs" style={{ color: secondaryTextColor, fontFamily }}>{formatDate(edu.graduation_date)}</p>}
+                    {edu.graduation_date && <p className="text-xs" style={{ color: secondaryTextColor, fontFamily }}>{formatResumeDate(edu.graduation_date)}</p>}
                   </div>
                 ))}
               </div>
@@ -1132,7 +1122,7 @@ const ContemporaryCleanTemplate = ({ data, customColors = {}, customFonts = {} }
                       <p className="text-sm font-semibold" style={{ color: accentColor, fontFamily }}>{exp.company}</p>
                     </div>
                     <div className="text-xs px-3 py-1 rounded-full" style={{ backgroundColor: lightAccent, color: textColor, fontFamily }}>
-                      {formatDate(exp.start_date)} - {exp.current ? "Present" : formatDate(exp.end_date)}
+                      {formatResumeDate(exp.start_date)} - {exp.current ? "Present" : formatResumeDate(exp.end_date)}
                     </div>
                   </div>
                   {exp.responsibilities && exp.responsibilities.length > 0 && (
@@ -1162,7 +1152,7 @@ const ContemporaryCleanTemplate = ({ data, customColors = {}, customFonts = {} }
                     <h3 className="text-sm font-bold mb-1" style={{ color: primaryColor, fontFamily }}>{edu.degree}</h3>
                     <p className="text-xs font-semibold mb-1" style={{ color: accentColor, fontFamily }}>{edu.institution}</p>
                     {edu.graduation_date && (
-                      <p className="text-xs" style={{ color: textColor, fontFamily }}>{formatDate(edu.graduation_date)}</p>
+                      <p className="text-xs" style={{ color: textColor, fontFamily }}>{formatResumeDate(edu.graduation_date)}</p>
                     )}
                   </div>
                 ))}
@@ -1245,59 +1235,72 @@ export default function ResumeTemplate({ data, template, scale = 1, showFirstPag
 }
 
 export const TEMPLATE_OPTIONS = [
+  // FREE TEMPLATES (5)
   {
     id: 'classic-professional',
     name: 'Classic Professional',
     description: 'Traditional single-column layout. Perfect for conservative industries.',
+    isPremium: false,
   },
   {
     id: 'modern-minimalist',
     name: 'Modern Minimalist',
     description: 'Clean two-column design with blue accents. Great for tech roles.',
+    isPremium: false,
   },
   {
     id: 'creative-bold',
     name: 'Color Accents',
     description: 'Professional layout with indigo accents. Modern yet refined.',
+    isPremium: false,
   },
   {
     id: 'executive-elegant',
     name: 'Executive Elegant',
     description: 'Sophisticated layout. Perfect for senior-level positions.',
+    isPremium: false,
   },
   {
     id: 'tech-sleek',
     name: 'Tech Sleek',
     description: 'Modern grid design. Great for developers and tech professionals.',
+    isPremium: false,
   },
+  // PREMIUM TEMPLATES (6)
   {
     id: 'professional-columns',
     name: 'Professional Columns',
     description: 'Three-column layout. Ideal for experienced professionals.',
+    isPremium: true,
   },
   {
     id: 'professional-compact',
     name: 'Professional Compact',
     description: 'Space-efficient design. Perfect for early career professionals.',
+    isPremium: true,
   },
   {
     id: 'modern-professional',
     name: 'Modern Professional',
     description: 'Contemporary design with bold header. Great for business.',
+    isPremium: true,
   },
   {
     id: 'clean-formal',
     name: 'Clean Formal',
     description: 'Traditional formal design. Suitable for academic roles.',
+    isPremium: true,
   },
   {
     id: 'artistic-modern',
     name: 'Artistic Modern',
     description: 'Creative design with warm gradients. Perfect for designers.',
+    isPremium: true,
   },
   {
     id: 'contemporary-clean',
     name: 'Contemporary Clean',
     description: 'Modern minimalist with accents. Great for versatile use.',
+    isPremium: true,
   },
 ];

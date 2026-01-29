@@ -8,10 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Edit2, Trash2, ArrowUp, ArrowDown, Eye, EyeOff, HelpCircle, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/notification";
 import { motion } from "framer-motion";
 
 export default function FAQManager({ showNotification }) {
   const [editingFaq, setEditingFaq] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, faqId: null });
   const [isAdding, setIsAdding] = useState(false);
   const queryClient = useQueryClient();
 
@@ -271,18 +273,16 @@ export default function FAQManager({ showNotification }) {
                       size="sm"
                       onClick={() => setEditingFaq(faq)}
                       className="text-indigo-600 dark:text-indigo-400"
+                      title="Edit FAQ"
                     >
                       <Edit2 className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        if (confirm("Are you sure you want to delete this FAQ?")) {
-                          deleteMutation.mutate(faq.id);
-                        }
-                      }}
+                      onClick={() => setDeleteConfirm({ open: true, faqId: faq.id })}
                       className="text-red-600 dark:text-red-400"
+                      title="Delete FAQ"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -293,6 +293,20 @@ export default function FAQManager({ showNotification }) {
           </div>
         )}
       </Card>
+      <ConfirmDialog
+        open={deleteConfirm.open}
+        onClose={() => setDeleteConfirm({ open: false, faqId: null })}
+        onConfirm={() => {
+          if (deleteConfirm.faqId) {
+            deleteMutation.mutate(deleteConfirm.faqId);
+          }
+        }}
+        title="Delete FAQ"
+        message="Are you sure you want to delete this FAQ? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
     </div>
   );
 }

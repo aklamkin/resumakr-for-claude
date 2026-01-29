@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "@/api/apiClient";
 import CoverLetterTemplate, { COVER_LETTER_TEMPLATES } from "./CoverLetterTemplate";
+import { NotificationPopup } from "@/components/ui/notification";
 
 export default function CoverLetterModal({ 
   open, 
@@ -27,6 +28,7 @@ export default function CoverLetterModal({
   const [loading, setLoading] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editedContent, setEditedContent] = useState("");
+  const [notification, setNotification] = useState({ open: false, title: "", message: "", type: "success" });
 
   // Initialize template based on resume's template
   useEffect(() => {
@@ -61,71 +63,23 @@ export default function CoverLetterModal({
   const generateCoverLetter = async () => {
     setLoading(true);
     try {
-      const personalInfo = resumeData?.personal_info || {};
-      
-      const resumeSummary = `
-Name: ${personalInfo.full_name || 'N/A'}
-Professional Summary: ${resumeData?.professional_summary || 'N/A'}
-
-Work Experience:
-${(resumeData?.work_experience || []).map(exp => 
-  `- ${exp.position} at ${exp.company} (${exp.start_date} - ${exp.current ? 'Present' : exp.end_date})`
-).join('\n')}
-
-Skills:
-${(resumeData?.skills || []).map(cat => `${cat.category}: ${cat.items?.join(', ')}`).join('\n')}
-
-Education:
-${(resumeData?.education || []).map(edu => 
-  `${edu.degree} in ${edu.field_of_study || 'N/A'} from ${edu.institution}`
-).join('\n')}
-      `.trim();
-
-      const basePrompt = `You are a professional cover letter writer. Create a compelling cover letter based on the candidate's resume and the job description provided.
-
-CRITICAL INSTRUCTIONS:
-1. NEVER make up information or hallucinate details
-2. Only use information explicitly provided in the resume
-3. Be professional, enthusiastic, and concise
-4. Address how the candidate's actual experience matches the job requirements
-5. Do NOT include salutation, date, or closing - ONLY the body paragraphs
-6. Start directly with the first paragraph
-
-Resume Information:
-${resumeSummary}
-
-${jobDescription ? `Job Description:\n${jobDescription}\n\n` : ''}
-
-Write a {VERSION_TYPE} cover letter that:
-- Highlights the candidate's relevant experience and skills
-- Shows enthusiasm for the position
-- Explains why they're a good fit
-- Maintains a professional tone
-- {VERSION_INSTRUCTIONS}
-
-Return ONLY the body paragraphs, no salutation, no date, no closing signature.`;
-
-      // Generate short version
-      const shortPrompt = basePrompt
-        .replace('{VERSION_TYPE}', 'concise, impactful')
-        .replace('{VERSION_INSTRUCTIONS}', 'Keep it to 3-4 short paragraphs (250-300 words maximum)');
-
-      const shortResponse = await api.integrations.Core.InvokeLLM({
-        prompt: shortPrompt,
+      // Generate short version via backend (prompt loaded from DB)
+      const shortResponse = await api.integrations.Core.GenerateCoverLetter({
+        version_type: 'short',
+        resume_data: resumeData,
+        job_description: jobDescription || ''
       });
 
-      // Generate long version
-      const longPrompt = basePrompt
-        .replace('{VERSION_TYPE}', 'detailed, comprehensive')
-        .replace('{VERSION_INSTRUCTIONS}', 'Provide more detail about experiences and skills, 4-5 paragraphs (400-500 words)');
-
-      const longResponse = await api.integrations.Core.InvokeLLM({
-        prompt: longPrompt,
+      // Generate long version via backend (prompt loaded from DB)
+      const longResponse = await api.integrations.Core.GenerateCoverLetter({
+        version_type: 'long',
+        resume_data: resumeData,
+        job_description: jobDescription || ''
       });
 
       // Extract result from response object
-      const shortText = (shortResponse.result || shortResponse).trim();
-      const longText = (longResponse.result || longResponse).trim();
+      const shortText = (shortResponse.result || shortResponse).toString().trim();
+      const longText = (longResponse.result || longResponse).toString().trim();
 
       setShortVersion(shortText);
       setLongVersion(longText);
@@ -486,7 +440,7 @@ Return ONLY the body paragraphs, no salutation, no date, no closing signature.`;
 
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
-        alert('Please allow popups to generate PDF');
+        setNotification({ open: true, title: "Popup Blocked", message: "Please allow popups to generate PDF.", type: "error" });
         return;
       }
 
@@ -509,6 +463,7 @@ Return ONLY the body paragraphs, no salutation, no date, no closing signature.`;
   const templateFonts = customFonts[currentTemplate.id] || {};
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] w-[1400px] max-h-[95vh] overflow-hidden p-0 dark:bg-slate-900 dark:border-slate-700">
         <DialogHeader className="p-6 pb-4 border-b border-slate-200 dark:border-slate-700">
@@ -757,5 +712,13 @@ Return ONLY the body paragraphs, no salutation, no date, no closing signature.`;
         )}
       </DialogContent>
     </Dialog>
+    <NotificationPopup
+      open={notification.open}
+      onClose={() => setNotification({ ...notification, open: false })}
+      title={notification.title}
+      message={notification.message}
+      type={notification.type}
+    />
+  </>
   );
 }

@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import passport from './config/passport.js';
+import './config/passportAdmin.js';
 
 import authRoutes from './routes/auth.js';
 import resumeRoutes from './routes/resumes.js';
@@ -21,14 +22,31 @@ import promptRoutes from './routes/prompts.js';
 import faqRoutes from './routes/faq.js';
 import couponRoutes from './routes/coupons.js';
 import settingsRoutes from './routes/settings.js';
-import usersRoutes from './routes/users.js';
+
 import paymentRoutes from './routes/payments.js';
 import webhookRoutes from './routes/webhooks.js';
+import exportsRoutes from './routes/exports.js';
+import templatesRoutes from './routes/templates.js';
+import stripeProfilesRoutes from './routes/stripeProfiles.js';
+
+// Admin routes (separate auth system)
+import adminAuthRoutes from './routes/admin/auth.js';
+import adminUsersRoutes from './routes/admin/adminUsers.js';
+import adminSettingsRoutes from './routes/admin/settings.js';
+import adminAppUsersRoutes from './routes/admin/users.js';
+import adminProvidersRoutes from './routes/admin/providers.js';
+import adminPromptsRoutes from './routes/admin/prompts.js';
+import adminPlansRoutes from './routes/admin/plans.js';
+import adminCouponsRoutes from './routes/admin/coupons.js';
+import adminFaqRoutes from './routes/admin/faq.js';
+import adminStripeProfilesRoutes from './routes/admin/stripeProfiles.js';
 
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFound } from './middleware/notFound.js';
+import { maintenanceCheck } from './middleware/maintenance.js';
 import { requestIdMiddleware, httpLogger } from './middleware/requestId.js';
 import logger, { log } from './utils/logger.js';
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,7 +70,24 @@ const PORT = process.env.PORT || 3001;
 app.set('trust proxy', 1);
 
 app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true }));
+
+// CORS: allow both main frontend and config app origins
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:5173',
+  process.env.CONFIG_APP_URL || 'http://localhost:5174'
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like server-to-server or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+      return callback(null, true);
+    }
+    callback(null, false);
+  },
+  credentials: true
+}));
 
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
@@ -93,7 +128,10 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+// Maintenance mode check (blocks main app API when enabled, allows admin/health/public settings)
+app.use(maintenanceCheck);
 
+// Main app API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/resumes', resumeRoutes);
 app.use('/api/resume-data', resumeDataRoutes);
@@ -107,9 +145,31 @@ app.use('/api/providers', providerRoutes);
 app.use('/api/faq', faqRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/settings', settingsRoutes);
-app.use('/api/users', usersRoutes);
+
+app.use('/api/exports', exportsRoutes);
+app.use('/api/templates', templatesRoutes);
+app.use('/api/stripe-profiles', stripeProfilesRoutes);
+
+// Admin API routes (separate auth system via admin_users table)
+app.use('/api/admin/auth', adminAuthRoutes);
+app.use('/api/admin/admin-users', adminUsersRoutes);
+app.use('/api/admin/settings', adminSettingsRoutes);
+app.use('/api/admin/users', adminAppUsersRoutes);
+app.use('/api/admin/providers', adminProvidersRoutes);
+app.use('/api/admin/prompts', adminPromptsRoutes);
+app.use('/api/admin/plans', adminPlansRoutes);
+app.use('/api/admin/coupons', adminCouponsRoutes);
+app.use('/api/admin/faq', adminFaqRoutes);
+app.use('/api/admin/stripe-profiles', adminStripeProfilesRoutes);
 
 app.use('/uploads', express.static(process.env.UPLOAD_DIR || path.join(__dirname, '../../uploads')));
+
+// Serve config app at /config (separate admin SPA)
+const configAppDist = path.join(__dirname, '../../config-app/dist');
+app.use('/config', express.static(configAppDist));
+app.get('/config/*', (req, res) => {
+  res.sendFile(path.join(configAppDist, 'index.html'));
+});
 
 app.use(notFound);
 app.use(errorHandler);

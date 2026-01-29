@@ -1,12 +1,13 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { authenticate, requireSubscription } from '../middleware/auth.js';
+import { authenticate } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { createResumeSchema, updateResumeSchema, uuidParamSchema, resumeQuerySchema } from '../validators/schemas.js';
+import { canCreateResume, logResumeCreation } from '../utils/usageTracking.js';
 
 const router = express.Router();
 router.use(authenticate);
-router.use(requireSubscription); // All resume operations require active subscription
+// NOTE: requireSubscription removed - freemium users can access resumes
 
 // Whitelist of allowed sort columns to prevent SQL injection
 const ALLOWED_SORT_COLUMNS = ['created_at', 'updated_at', 'title', 'status'];
@@ -60,11 +61,55 @@ router.get('/:id', validate(uuidParamSchema, 'params'), async (req, res) => {
 
 router.post('/', validate(createResumeSchema), async (req, res) => {
   try {
+    // Rate limit check for free users (3 resumes per 24 hours)
+    if (req.user.effectiveTier === 'free') {
+      const rateLimit = await canCreateResume(req.user.id, req.user.tierLimits.maxResumesPerDay);
+      if (!rateLimit.allowed) {
+        return res.status(429).json({
+          error: 'Rate limit exceeded',
+          message: `Free accounts can create up to ${req.user.tierLimits.maxResumesPerDay} resumes per day. Try again in ${rateLimit.resetIn}.`,
+          resumesCreated: rateLimit.count,
+          limit: req.user.tierLimits.maxResumesPerDay,
+          resetIn: rateLimit.resetIn,
+          upgradeUrl: '/pricing'
+        });
+      }
+    }
+
+    // Check max_resumes_per_user setting
+    const settingResult = await query(
+      "SELECT setting_value FROM app_settings WHERE setting_key = 'max_resumes_per_user'"
+    );
+    if (settingResult.rows.length > 0) {
+      const maxResumes = parseInt(settingResult.rows[0].setting_value, 10);
+      if (maxResumes > 0) {
+        const countResult = await query(
+          'SELECT COUNT(*) AS count FROM resumes WHERE created_by = $1',
+          [req.user.id]
+        );
+        const currentCount = parseInt(countResult.rows[0].count, 10);
+        if (currentCount >= maxResumes) {
+          return res.status(403).json({
+            error: 'Resume limit reached',
+            message: `You have reached the maximum of ${maxResumes} resumes. Please delete an existing resume before creating a new one.`,
+            currentCount,
+            limit: maxResumes
+          });
+        }
+      }
+    }
+
     // Data validated by middleware
     const { title, status, source_type } = req.body;
     const { file_url, last_edited_step } = req.body; // These pass through without strict validation for now
 
     const result = await query('INSERT INTO resumes (title, status, source_type, file_url, last_edited_step, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *', [title, status, source_type, file_url, last_edited_step, req.user.id]);
+
+    // Log resume creation for rate limiting (free users only)
+    if (req.user.effectiveTier === 'free') {
+      await logResumeCreation(req.user.id, result.rows[0].id);
+    }
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Create resume error:', error);

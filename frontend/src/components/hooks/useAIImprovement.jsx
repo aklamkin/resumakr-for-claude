@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import api from "@/api/apiClient";
 
-export function useAIImprovement(resumeData, setResumeData, providers, prompts) {
+export function useAIImprovement(resumeData, setResumeData, providers, prompts, onError) {
   const [sectionVersions, setSectionVersions] = useState({});
   const [sectionLoading, setSectionLoading] = useState({});
   const lastCallTime = useRef({});
@@ -12,89 +12,58 @@ export function useAIImprovement(resumeData, setResumeData, providers, prompts) 
     const now = Date.now();
     const lastCall = lastCallTime.current[sectionKey] || 0;
     const timeSinceLastCall = now - lastCall;
-    
+
     if (timeSinceLastCall < MIN_CALL_INTERVAL) {
       const waitTime = MIN_CALL_INTERVAL - timeSinceLastCall;
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
-    
+
     lastCallTime.current[sectionKey] = Date.now();
     setSectionLoading(prev => ({ ...prev, [sectionKey]: true }));
 
     try {
-      const targetProviders = providerId
-        ? providers.filter(p => p.id === providerId)
-        : providers.filter(p => p.is_default).slice(0, 1); // Reduced to 1 provider to avoid rate limits
-
-      if (targetProviders.length === 0) {
-        throw new Error("No AI providers configured");
-      }
-
-      const defaultPrompt = prompts.find(p => p.is_default);
       const isSkillsSection = sectionKey.startsWith('skills-');
       const atsResults = resumeData?.ats_analysis_results;
-      const hasMissingKeywords = atsResults?.missing_keywords?.length > 0;
+      const missingKeywords = atsResults?.missing_keywords?.slice(0, 10) || [];
 
-      const atsContext = hasMissingKeywords
-        ? `\n\nATS OPTIMIZATION CONTEXT:
-The following keywords from the job description are missing: ${atsResults.missing_keywords.join(', ')}
-IMPORTANT: Try to naturally incorporate these keywords where genuinely applicable. NEVER fabricate experience or skills you don't have.`
-        : '';
-
-      const systemPrompt = isSkillsSection
-        ? `Professional resume writer. Refine skills: keep same length (±20%), no new skills, no duplicates, pipe-separated output only. Make professional/industry-standard.${hasMissingKeywords ? ' Add ATS keywords only if directly relevant: ' + atsResults.missing_keywords.slice(0, 5).join(', ') : ''}`
-        : `Professional resume writer. Improve text: same length (±20%), keep facts exact, use action verbs, return improved text only.${hasMissingKeywords ? ' Add relevant keywords: ' + atsResults.missing_keywords.slice(0, 5).join(', ') : ''}`;
-
-      const allVersions = [];
-
-      for (const provider of targetProviders) {
-        const customPrompt = provider.custom_prompt_id
-          ? prompts.find(p => p.id === provider.custom_prompt_id)
-          : defaultPrompt;
-
-        const promptInstruction = customPrompt?.prompt_text || 
-            (isSkillsSection
-              ? "Refine ONLY the wording/naming of these skills for THIS SPECIFIC category. Output must be roughly the same size as input. Do NOT add new skills. Do NOT create duplicates. Keep each skill specific and technical. Return the refined list separated by pipe character (|)."
-              : "Improve the following resume section. Keep it roughly the same length.");
-
-        const userPrompt = promptInstruction.includes('{section_content}')
-          ? promptInstruction.replace(/{section_content}/g, content)
-          : `${promptInstruction}\n\nContent:\n${content}`;
-
-        const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
-
-        try {
-          // Generate 1 AI version for faster response (< 9 seconds target)
-          // User can re-generate if they want a different version
-          const response = await api.integrations.Core.InvokeLLM({
-            prompt: fullPrompt,
-            max_tokens: 500,      // Reduced for faster responses (bullets are short)
-            temperature: 0.3      // Lower temp = faster & more consistent
-          });
-          allVersions.push(response.result || response);
-        } catch (err) {
-          if (err.message?.includes('rate limit') || err.message?.includes('Rate limit')) {
-            throw new Error("Rate limit exceeded. Please wait a moment before trying again.");
-          }
-          console.error(`Error from ${provider.name}:`, err);
-        }
+      // Determine section type for the backend
+      let sectionType;
+      if (isSkillsSection) {
+        sectionType = 'skills';
+      } else if (sectionKey === 'professional_summary') {
+        sectionType = 'summary';
+      } else {
+        sectionType = 'bullets';
       }
 
-      if (allVersions.length > 0) {
-        setSectionVersions(prev => ({ ...prev, [sectionKey]: allVersions }));
+      // Call the backend endpoint which loads prompts from DB
+      const response = await api.integrations.Core.ImproveSection({
+        section_type: sectionType,
+        section_content: content,
+        missing_keywords: missingKeywords,
+        resumeId: resumeData?.resume_id
+      });
+
+      const result = response.result || response;
+      if (result) {
+        setSectionVersions(prev => ({ ...prev, [sectionKey]: [result] }));
       } else {
         throw new Error("Failed to generate versions. Please try again.");
       }
     } catch (err) {
       console.error("Error generating versions:", err);
       setSectionLoading(prev => ({ ...prev, [sectionKey]: false }));
-      
+
       // Show user-friendly error message
       const errorMessage = err.message?.includes('rate limit') || err.message?.includes('Rate limit')
         ? "Rate limit exceeded. Please wait 10-15 seconds before trying again."
+        : err.message?.includes('credits') || err.message?.includes('Credits')
+        ? err.message
         : "Failed to generate suggestions. Please try again in a moment.";
-      
-      alert(errorMessage);
+
+      if (onError) {
+        onError(errorMessage, "AI Error", "error");
+      }
       return;
     } finally {
       setSectionLoading(prev => ({ ...prev, [sectionKey]: false }));
