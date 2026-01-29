@@ -17,7 +17,7 @@ export function UpgradePrompt({ feature, message, compact = false }) {
     resumeParsing: 'AI resume parsing is a premium feature.',
     premiumTemplates: 'This template is only available to premium users.',
     atsDetailedInsights: 'Detailed ATS insights are a premium feature.',
-    aiCredits: 'You\'ve used all your free AI credits.',
+    aiCredits: 'You\'ve used all your AI credits for this month.',
     pdfDownloads: 'You\'ve reached your monthly PDF download limit.',
   };
 
@@ -88,7 +88,7 @@ export function AiCreditsIndicator({ credits, compact = false }) {
         'bg-blue-100 text-blue-700'
       }`}>
         <Zap className="h-3 w-3" />
-        <span>{remaining}/{total} AI credits</span>
+        <span>{isExhausted ? 'No AI credits left' : `${remaining} AI credit${remaining !== 1 ? 's' : ''} left`}</span>
       </div>
     );
   }

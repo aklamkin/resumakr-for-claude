@@ -203,7 +203,7 @@ export default function ATSAnalysisCard({
               'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
             }`}>
               <Zap className="w-3 h-3" />
-              <span>{aiCredits.remaining}/{aiCredits.total} AI credits</span>
+              <span>{aiCredits.remaining <= 0 ? 'No AI credits left' : `${aiCredits.remaining} AI credit${aiCredits.remaining !== 1 ? 's' : ''} left`}</span>
             </div>
           )}
         </div>

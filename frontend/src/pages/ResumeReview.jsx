@@ -582,14 +582,20 @@ export default function ResumeReview() {
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
                   <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                  <div>
+                  <div className="space-y-1">
                     <p className="font-semibold text-indigo-900 dark:text-indigo-200">Free Plan</p>
-                    <div className="text-sm text-indigo-700 dark:text-indigo-300 space-y-1">
-                      <p>✓ View resume &nbsp; ✓ PDF credits: {pdfStatus?.remaining ?? 5}/{pdfStatus?.limit ?? 5}{pdfStatus?.watermark ? ' (with watermark)' : ''}</p>
-                      <p className="flex items-center gap-1">
-                        <Zap className="w-3 h-3" /> AI Credits: {aiCredits?.remaining ?? 5}/{aiCredits?.total ?? 5} remaining
-                      </p>
+                    <div className="flex items-center gap-3 text-sm text-indigo-700 dark:text-indigo-300">
+                      <span className="flex items-center gap-1">
+                        <Zap className="w-3 h-3" /> <strong>{aiCredits?.remaining ?? 5}</strong> AI credit{(aiCredits?.remaining ?? 5) !== 1 ? 's' : ''}
+                      </span>
+                      <span className="text-indigo-300 dark:text-indigo-600">·</span>
+                      <span className="flex items-center gap-1">
+                        <Download className="w-3 h-3" /> <strong>{pdfStatus?.remaining ?? 5}</strong> download{(pdfStatus?.remaining ?? 5) !== 1 ? 's' : ''}{pdfStatus?.watermark ? ' (watermark)' : ''}
+                      </span>
                     </div>
+                    <p className="text-xs text-indigo-400 dark:text-indigo-500">
+                      Resets {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                    </p>
                   </div>
                 </div>
                 <Button
@@ -920,6 +926,7 @@ export default function ResumeReview() {
         onClose={() => setShowCoverLetterModal(false)}
         resumeData={resumeData}
         jobDescription={jobDescription}
+        isPremiumUser={isPaid}
         onCoverLetterSaved={(coverLetterData) => {
           setResumeData(prev => ({ ...prev, ...coverLetterData }));
         }} />

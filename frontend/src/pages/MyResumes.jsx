@@ -952,54 +952,79 @@ export default function MyResumes() {
               animate={{ opacity: 1, y: 0 }}
               className="mb-6"
             >
-              <Card className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/50 border border-slate-200 dark:border-slate-700">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  {/* Usage Stats */}
-                  <div className="flex flex-wrap items-center gap-4">
-                    {/* AI Credits */}
-                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
-                      aiCredits?.remaining <= 0
-                        ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                        : aiCredits?.remaining <= 2
-                          ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                          : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                    }`}>
-                      <Zap className="w-4 h-4" />
-                      <span className="font-medium">{aiCredits?.remaining ?? 5}/{aiCredits?.total ?? 5}</span>
-                      <span className="hidden sm:inline">AI credits</span>
+              <Card className="overflow-hidden border border-slate-200 dark:border-slate-700">
+                <div className="p-4 sm:p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-5">
+                    {/* Credit metrics */}
+                    <div className="flex items-center gap-5 sm:gap-6">
+                      {/* AI Credits */}
+                      <div className="flex items-center gap-2.5">
+                        <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${
+                          (aiCredits?.remaining ?? 5) <= 0 ? 'bg-red-100 dark:bg-red-900/30' :
+                          (aiCredits?.remaining ?? 5) <= 2 ? 'bg-amber-100 dark:bg-amber-900/30' :
+                          'bg-blue-100 dark:bg-blue-900/30'
+                        }`}>
+                          <Zap className={`w-[18px] h-[18px] ${
+                            (aiCredits?.remaining ?? 5) <= 0 ? 'text-red-600 dark:text-red-400' :
+                            (aiCredits?.remaining ?? 5) <= 2 ? 'text-amber-600 dark:text-amber-400' :
+                            'text-blue-600 dark:text-blue-400'
+                          }`} />
+                        </div>
+                        <div>
+                          <p className={`text-xl font-bold leading-none ${(aiCredits?.remaining ?? 5) <= 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
+                            {aiCredits?.remaining ?? 5}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">AI credits</p>
+                        </div>
+                      </div>
+
+                      {/* Downloads */}
+                      {pdfStatus && (
+                        <div className="flex items-center gap-2.5">
+                          <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${
+                            pdfStatus.remaining <= 0 ? 'bg-red-100 dark:bg-red-900/30' :
+                            pdfStatus.remaining <= 1 ? 'bg-amber-100 dark:bg-amber-900/30' :
+                            'bg-emerald-100 dark:bg-emerald-900/30'
+                          }`}>
+                            <Download className={`w-[18px] h-[18px] ${
+                              pdfStatus.remaining <= 0 ? 'text-red-600 dark:text-red-400' :
+                              pdfStatus.remaining <= 1 ? 'text-amber-600 dark:text-amber-400' :
+                              'text-emerald-600 dark:text-emerald-400'
+                            }`} />
+                          </div>
+                          <div>
+                            <p className={`text-xl font-bold leading-none ${pdfStatus.remaining <= 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
+                              {pdfStatus.remaining}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Downloads</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
-                    {/* PDF Downloads */}
-                    {pdfStatus && (
-                      <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
-                        pdfStatus.remaining <= 0
-                          ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                          : pdfStatus.remaining <= 1
-                            ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                            : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
-                      }`}>
-                        <Download className="w-4 h-4" />
-                        <span className="font-medium">{pdfStatus.remaining}/{pdfStatus.limit}</span>
-                        <span className="hidden sm:inline">PDF credits</span>
+                    {/* Upgrade CTA */}
+                    <div className="flex items-center gap-3">
+                      <div className="hidden sm:block text-right">
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Go unlimited</p>
+                        <p className="text-xs text-muted-foreground">Unlock all features</p>
                       </div>
-                    )}
+                      <Button
+                        onClick={handleUpgrade}
+                        size="sm"
+                        className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-sm"
+                      >
+                        <Crown className="w-4 h-4 mr-2" />
+                        Upgrade
+                      </Button>
+                    </div>
                   </div>
+                </div>
 
-                  {/* Upgrade CTA */}
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-slate-600 dark:text-slate-400 hidden md:inline">
-                      <Crown className="w-4 h-4 inline mr-1 text-amber-500" />
-                      Upgrade for unlimited
-                    </span>
-                    <Button
-                      onClick={handleUpgrade}
-                      size="sm"
-                      className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
-                    >
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Upgrade
-                    </Button>
-                  </div>
+                {/* Footer with reset date */}
+                <div className="px-4 sm:px-5 py-2 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700/50">
+                  <p className="text-xs text-muted-foreground">
+                    Credits reset {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                  </p>
                 </div>
               </Card>
             </motion.div>

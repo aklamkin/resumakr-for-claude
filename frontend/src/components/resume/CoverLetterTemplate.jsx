@@ -2,60 +2,73 @@ import React from "react";
 import { formatDate } from "../utils/dateUtils";
 
 export const COVER_LETTER_TEMPLATES = [
+  // FREE TEMPLATES (5)
   {
     id: 'classic-professional',
     name: 'Classic Professional',
-    description: 'Traditional single-column layout. Perfect for conservative industries.'
+    description: 'Traditional single-column layout. Perfect for conservative industries.',
+    isPremium: false,
   },
   {
     id: 'modern-minimalist',
     name: 'Modern Minimalist',
-    description: 'Clean two-column design with blue accents. Great for tech roles.'
+    description: 'Clean two-column design with blue accents. Great for tech roles.',
+    isPremium: false,
   },
   {
     id: 'creative-bold',
     name: 'Color Accents',
-    description: 'Professional layout with indigo accents. Modern yet refined.'
+    description: 'Professional layout with indigo accents. Modern yet refined.',
+    isPremium: false,
   },
   {
     id: 'executive-elegant',
     name: 'Executive Elegant',
-    description: 'Sophisticated layout. Perfect for senior-level positions.'
+    description: 'Sophisticated layout. Perfect for senior-level positions.',
+    isPremium: false,
   },
   {
     id: 'tech-sleek',
     name: 'Tech Sleek',
-    description: 'Modern grid design. Great for developers and tech professionals.'
+    description: 'Modern grid design. Great for developers and tech professionals.',
+    isPremium: false,
   },
+  // PREMIUM TEMPLATES (6)
   {
     id: 'professional-columns',
     name: 'Professional Columns',
-    description: 'Three-column layout. Ideal for experienced professionals.'
+    description: 'Three-column layout. Ideal for experienced professionals.',
+    isPremium: true,
   },
   {
     id: 'professional-compact',
     name: 'Professional Compact',
-    description: 'Space-efficient design. Perfect for early career professionals.'
+    description: 'Space-efficient design. Perfect for early career professionals.',
+    isPremium: true,
   },
   {
     id: 'modern-professional',
     name: 'Modern Professional',
-    description: 'Contemporary design with bold header. Great for business.'
+    description: 'Contemporary design with bold header. Great for business.',
+    isPremium: true,
   },
   {
     id: 'clean-formal',
     name: 'Clean Formal',
-    description: 'Traditional formal design. Suitable for academic roles.'
+    description: 'Traditional formal design. Suitable for academic roles.',
+    isPremium: true,
   },
   {
     id: 'artistic-modern',
     name: 'Artistic Modern',
-    description: 'Creative design with warm gradients. Perfect for designers.'
+    description: 'Creative design with warm gradients. Perfect for designers.',
+    isPremium: true,
   },
   {
     id: 'contemporary-clean',
     name: 'Contemporary Clean',
-    description: 'Modern minimalist with accents. Great for versatile use.'
+    description: 'Modern minimalist with accents. Great for versatile use.',
+    isPremium: true,
   }
 ];
 

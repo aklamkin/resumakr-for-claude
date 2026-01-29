@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight, Download, Loader2, FileText, Edit2, Save, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Loader2, FileText, Edit2, Save, X, Crown, Lock } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,12 +11,13 @@ import api from "@/api/apiClient";
 import CoverLetterTemplate, { COVER_LETTER_TEMPLATES } from "./CoverLetterTemplate";
 import { NotificationPopup } from "@/components/ui/notification";
 
-export default function CoverLetterModal({ 
-  open, 
-  onClose, 
+export default function CoverLetterModal({
+  open,
+  onClose,
   resumeData,
   jobDescription,
-  onCoverLetterSaved
+  onCoverLetterSaved,
+  isPremiumUser = false
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [downloading, setDownloading] = useState(false);
@@ -555,21 +556,7 @@ export default function CoverLetterModal({
                 </div>
               ) : (
                 <>
-                  <div className="flex flex-col items-center min-h-full w-full">
-                    <div className="w-full flex justify-end mb-2" style={{ maxWidth: '850px' }}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditedContent(getCurrentContent());
-                          setEditMode(true);
-                        }}
-                        className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 shadow-lg text-slate-700 dark:text-slate-200"
-                      >
-                        <Edit2 className="w-3.5 h-3.5 mr-1.5" />
-                        Edit Content
-                      </Button>
-                    </div>
+                  <div className="flex items-start justify-center min-h-full">
                     <AnimatePresence mode="wait">
                       <motion.div
                         key={`${currentTemplate.id}-${activeVersion}`}
@@ -577,9 +564,21 @@ export default function CoverLetterModal({
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                         transition={{ duration: 0.2 }}
-                        className="w-full"
+                        className="w-full relative"
                         style={{ maxWidth: '850px' }}
                       >
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditedContent(getCurrentContent());
+                            setEditMode(true);
+                          }}
+                          className="absolute top-4 right-12 z-20 bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 shadow-md text-slate-700 dark:text-slate-200 backdrop-blur-sm"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 mr-1.5" />
+                          Edit Content
+                        </Button>
                         <CoverLetterTemplate
                           personalInfo={resumeData?.personal_info || {}}
                           content={getCurrentContent()}
@@ -615,10 +614,10 @@ export default function CoverLetterModal({
                       <Tabs value={activeVersion} onValueChange={setActiveVersion} className="w-full">
                         <TabsList className="grid w-full grid-cols-2 bg-slate-800">
                           <TabsTrigger value="short" className="text-sm data-[state=active]:bg-slate-700 data-[state=active]:text-white text-slate-300">
-                            Short
+                            Detailed
                           </TabsTrigger>
                           <TabsTrigger value="long" className="text-sm data-[state=active]:bg-slate-700 data-[state=active]:text-white text-slate-300">
-                            Detailed
+                            Short
                           </TabsTrigger>
                         </TabsList>
                       </Tabs>
@@ -626,20 +625,44 @@ export default function CoverLetterModal({
                   </>
                 )}
 
+                {/* Free/Premium indicator */}
+                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-700">
+                  <span className="text-xs text-slate-400">
+                    {isPremiumUser ? (
+                      <span className="flex items-center gap-1 text-amber-400">
+                        <Crown className="w-3 h-3" /> Premium - All templates unlocked
+                      </span>
+                    ) : (
+                      <span>5 free templates • 6 premium</span>
+                    )}
+                  </span>
+                </div>
+
                 <div className="space-y-2 mb-6">
-                  {COVER_LETTER_TEMPLATES.map((template, idx) => (
-                    <button
-                      key={template.id}
-                      onClick={() => setCurrentIndex(idx)}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-sm ${
-                        currentIndex === idx
-                          ? 'bg-indigo-600 text-white font-medium'
-                          : 'hover:bg-slate-800 text-slate-300'
-                      }`}
-                    >
-                      {template.name}
-                    </button>
-                  ))}
+                  {COVER_LETTER_TEMPLATES.map((template, idx) => {
+                    const isLocked = template.isPremium && !isPremiumUser;
+                    return (
+                      <button
+                        key={template.id}
+                        onClick={() => setCurrentIndex(idx)}
+                        className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-sm flex items-center justify-between ${
+                          currentIndex === idx
+                            ? 'bg-indigo-600 text-white font-medium'
+                            : isLocked
+                              ? 'hover:bg-slate-800 text-slate-500'
+                              : 'hover:bg-slate-800 text-slate-300'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          {template.name}
+                          {template.isPremium && (
+                            <Crown className="w-3 h-3 text-amber-400" />
+                          )}
+                        </span>
+                        {isLocked && <Lock className="w-3 h-3 text-slate-500" />}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {/* Color Customization */}

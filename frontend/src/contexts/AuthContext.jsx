@@ -5,7 +5,7 @@ const AuthContext = createContext(null);
 
 // Default tier limits for free users (must match backend tierLimits.js)
 const FREE_TIER_LIMITS = {
-  aiCreditsTotal: 5,
+  aiCreditsPerMonth: 5,
   pdfDownloadsPerMonth: 5,
   maxResumesPerDay: 10,
   premiumTemplates: false,
@@ -19,7 +19,7 @@ const FREE_TIER_LIMITS = {
 };
 
 const PAID_TIER_LIMITS = {
-  aiCreditsTotal: Infinity,
+  aiCreditsPerMonth: Infinity,
   pdfDownloadsPerMonth: Infinity,
   maxResumesPerDay: Infinity,
   premiumTemplates: true,

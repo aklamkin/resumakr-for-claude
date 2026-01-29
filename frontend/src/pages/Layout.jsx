@@ -4,7 +4,8 @@ import { createPageUrl } from "@/utils";
 import {
   FileCheck, User,
   HelpCircle, DollarSign,
-  ChevronRight, ChevronLeft, CreditCard
+  ChevronRight, CreditCard,
+  PanelLeftClose, PanelLeftOpen
 } from "lucide-react";
 import api from "@/api/apiClient";
 
@@ -31,7 +32,8 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
   const location = useLocation();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [collapsed, setCollapsed] = useState(false);
+  const [locked, setLocked] = useState(() => localStorage.getItem('resumakr_sidebar_locked') === 'true');
+  const [collapsed, setCollapsed] = useState(!locked);
 
   React.useEffect(() => {
     loadUser();
@@ -55,6 +57,13 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
     }
   };
 
+  const toggleLock = () => {
+    const newLocked = !locked;
+    setLocked(newLocked);
+    setCollapsed(!newLocked);
+    localStorage.setItem('resumakr_sidebar_locked', String(newLocked));
+  };
+
   const visibleNavItems = user
     ? navigationItems
     : navigationItems.filter(item => !item.requiresAuth);
@@ -62,38 +71,32 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
   return (
     <div className="h-screen flex">
       {/* Sidebar */}
-      <aside className={`${collapsed ? 'w-16' : 'w-64'} border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex flex-col flex-shrink-0 transition-all duration-200`}>
-        {/* Header - Logo */}
-        <div className="border-b border-border/50 bg-muted/30 px-3 py-3 flex items-center justify-between flex-shrink-0">
-          {collapsed ? (
-            <button
-              onClick={() => setCollapsed(false)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 shadow-md flex-shrink-0 hover:opacity-80 transition-all mx-auto"
-            >
+      <aside
+        className={`${collapsed ? 'w-16' : 'w-64'} overflow-hidden border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex flex-col flex-shrink-0 transition-all duration-200`}
+        onMouseEnter={() => { if (!locked) setCollapsed(false); }}
+        onMouseLeave={() => { if (!locked) setCollapsed(true); }}
+      >
+        {/* Header - Logo + Lock */}
+        <div className="border-b border-border/50 bg-muted/30 px-3 py-3 flex items-center flex-shrink-0">
+          <Link
+            to={user ? createPageUrl("MyResumes") : "/"}
+            className="flex items-center gap-3 rounded-lg transition-all hover:opacity-80 cursor-pointer min-w-0 flex-1"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 shadow-md flex-shrink-0">
               <FileCheck className="h-5 w-5 text-white" />
-            </button>
-          ) : (
-            <>
-              <Link
-                to={user ? createPageUrl("MyResumes") : "/"}
-                className="flex items-center gap-3 rounded-lg transition-all hover:opacity-80 cursor-pointer min-w-0"
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 shadow-md flex-shrink-0">
-                  <FileCheck className="h-5 w-5 text-white" />
-                </div>
-                <div className="min-w-0">
-                  <h1 className="text-lg font-bold tracking-tight">Resumakr</h1>
-                  <p className="text-xs text-muted-foreground">Build Your Future</p>
-                </div>
-              </Link>
-              <button
-                onClick={() => setCollapsed(true)}
-                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground flex-shrink-0"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-            </>
-          )}
+            </div>
+            <div className={`min-w-0 whitespace-nowrap transition-opacity duration-150 ${collapsed ? 'opacity-0' : 'opacity-100 delay-75'}`}>
+              <h1 className="text-lg font-bold tracking-tight">Resumakr</h1>
+              <p className="text-xs text-muted-foreground">Build Your Future</p>
+            </div>
+          </Link>
+          <button
+            onClick={toggleLock}
+            className={`flex-shrink-0 p-1.5 rounded-md transition-all duration-150 ${collapsed ? 'opacity-0 pointer-events-none' : 'opacity-100 delay-75'} ${locked ? 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/40' : 'text-muted-foreground hover:text-foreground hover:bg-muted/70'}`}
+            title={locked ? 'Unlock sidebar' : 'Lock sidebar open'}
+          >
+            {locked ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+          </button>
         </div>
 
         {/* Navigation */}
@@ -116,7 +119,7 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
                 title={collapsed ? displayTitle : undefined}
               >
                 <DisplayIcon className="h-4 w-4 flex-shrink-0" />
-                {!collapsed && <span>{displayTitle}</span>}
+                <span className={`whitespace-nowrap transition-opacity duration-150 ${collapsed ? 'opacity-0' : 'opacity-100 delay-75'}`}>{displayTitle}</span>
               </Link>
             );
           })}
@@ -133,15 +136,11 @@ export default function Layout({ children, currentPageName, isPublicPage }) {
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex-shrink-0 group-hover:scale-105 transition-transform">
                 <User className="h-4 w-4 text-white" />
               </div>
-              {!collapsed && (
-                <>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium truncate">{user.full_name || 'User'}</p>
-                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                </>
-              )}
+              <div className={`min-w-0 flex-1 whitespace-nowrap transition-opacity duration-150 ${collapsed ? 'opacity-0' : 'opacity-100 delay-75'}`}>
+                <p className="text-xs font-medium truncate">{user.full_name || 'User'}</p>
+                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              </div>
+              <ChevronRight className={`h-4 w-4 text-muted-foreground transition-opacity duration-150 ${collapsed ? 'opacity-0' : 'opacity-0 group-hover:opacity-100 delay-75'}`} />
             </Link>
           </div>
         )}
