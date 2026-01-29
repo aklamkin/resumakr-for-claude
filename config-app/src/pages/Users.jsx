@@ -24,6 +24,7 @@ export default function Users() {
   const [editPassword, setEditPassword] = useState('');
   const [editPasswordConfirm, setEditPasswordConfirm] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
   const [newUser, setNewUser] = useState({
     email: '',
     password: '',
@@ -89,27 +90,15 @@ export default function Users() {
 
   const handleUpdateUser = async () => {
     if (!selectedUser) return;
-    const hasSubscription = selectedUser.is_subscribed;
-    const hasPlan = selectedUser.subscription_plan && selectedUser.subscription_plan !== 'none';
-    const hasEndDate = selectedUser.subscription_end_date;
-
-    if (hasSubscription && (!hasPlan || !hasEndDate)) {
-      alert('When marking subscription as active, you must also set Plan and Expiration Date.');
-      return;
-    }
-    if ((hasPlan || hasEndDate) && !hasSubscription) {
-      alert('When setting Plan or Expiration Date, you must also mark subscription as active.');
-      return;
-    }
 
     const updates = {
       email: selectedUser.email,
       full_name: selectedUser.full_name,
       role: selectedUser.role,
       is_subscribed: selectedUser.is_subscribed,
-      subscription_plan: selectedUser.subscription_plan === 'none' ? null : selectedUser.subscription_plan,
-      subscription_end_date: selectedUser.subscription_end_date,
-      subscription_price: selectedUser.subscription_price,
+      subscription_plan: selectedUser.is_subscribed ? (selectedUser.subscription_plan === 'none' ? null : selectedUser.subscription_plan) : null,
+      subscription_end_date: selectedUser.is_subscribed ? selectedUser.subscription_end_date : null,
+      subscription_price: selectedUser.is_subscribed ? selectedUser.subscription_price : null,
     };
 
     if (!selectedUser.oauth_provider && editPassword && editPassword === editPasswordConfirm) {
@@ -312,6 +301,36 @@ export default function Users() {
         </DialogContent>
       </Dialog>
 
+      {/* Deactivate Subscription Confirmation */}
+      <Dialog open={showDeactivateConfirm} onOpenChange={setShowDeactivateConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Active Subscription</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate the subscription for {selectedUser?.email}? This will clear all subscription details (plan, expiration date, and price).
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeactivateConfirm(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setSelectedUser({
+                  ...selectedUser,
+                  is_subscribed: false,
+                  subscription_plan: null,
+                  subscription_end_date: null,
+                  subscription_price: null,
+                });
+                setShowDeactivateConfirm(false);
+              }}
+            >
+              Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit User Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -380,21 +399,34 @@ export default function Users() {
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold border-b pb-2">Subscription Management</h3>
                 <div className="flex items-center space-x-2">
-                  <Checkbox checked={selectedUser.is_subscribed || false} onCheckedChange={(checked) => setSelectedUser({ ...selectedUser, is_subscribed: checked })} />
+                  <Checkbox
+                    checked={selectedUser.is_subscribed || false}
+                    onCheckedChange={(checked) => {
+                      if (!checked && selectedUser.is_subscribed) {
+                        setShowDeactivateConfirm(true);
+                      } else {
+                        setSelectedUser({ ...selectedUser, is_subscribed: checked });
+                      }
+                    }}
+                  />
                   <Label className="font-normal cursor-pointer">Active Subscription</Label>
                 </div>
-                <div className="space-y-2">
-                  <Label>Subscription Plan</Label>
-                  <Input value={selectedUser.subscription_plan || ''} onChange={(e) => setSelectedUser({ ...selectedUser, subscription_plan: e.target.value || null })} placeholder="e.g., monthly, annual" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Expiration Date</Label>
-                  <Input type="date" value={selectedUser.subscription_end_date ? new Date(selectedUser.subscription_end_date).toISOString().split('T')[0] : ''} onChange={(e) => setSelectedUser({ ...selectedUser, subscription_end_date: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Price (optional)</Label>
-                  <Input type="number" step="0.01" placeholder="0.00" value={selectedUser.subscription_price || ''} onChange={(e) => setSelectedUser({ ...selectedUser, subscription_price: e.target.value })} />
-                </div>
+                {selectedUser.is_subscribed && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Subscription Plan</Label>
+                      <Input value={selectedUser.subscription_plan || ''} onChange={(e) => setSelectedUser({ ...selectedUser, subscription_plan: e.target.value || null })} placeholder="e.g., monthly, annual" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Expiration Date</Label>
+                      <Input type="date" value={selectedUser.subscription_end_date ? new Date(selectedUser.subscription_end_date).toISOString().split('T')[0] : ''} onChange={(e) => setSelectedUser({ ...selectedUser, subscription_end_date: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Price (optional)</Label>
+                      <Input type="number" step="0.01" placeholder="0.00" value={selectedUser.subscription_price || ''} onChange={(e) => setSelectedUser({ ...selectedUser, subscription_price: e.target.value })} />
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Account Details */}

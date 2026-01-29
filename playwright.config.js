@@ -2,6 +2,7 @@
 const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
+  globalTeardown: './e2e/global-teardown.js',
   testDir: './e2e',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
