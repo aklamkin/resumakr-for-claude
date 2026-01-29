@@ -8,7 +8,8 @@ cmds = ["npm install"]
 cmds = [
   "mkdir -p uploads",
   "chmod 755 uploads",
-  "cd ../config-app && npm install && npm run build"
+  "cd ../config-app && npm install && npm run build",
+  "cp -r ../config-app/dist config-app-dist"
 ]
 
 [start]

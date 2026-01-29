@@ -5,6 +5,7 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import session from 'express-session';
 import dotenv from 'dotenv';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import passport from './config/passport.js';
@@ -165,7 +166,11 @@ app.use('/api/admin/stripe-profiles', adminStripeProfilesRoutes);
 app.use('/uploads', express.static(process.env.UPLOAD_DIR || path.join(__dirname, '../../uploads')));
 
 // Serve config app at /config (separate admin SPA)
-const configAppDist = path.join(__dirname, '../../config-app/dist');
+// In production (Railway), config-app is built into backend/config-app-dist during deploy
+// In local dev, it's at the sibling directory ../../config-app/dist
+const prodConfigPath = path.join(__dirname, '../config-app-dist');
+const devConfigPath = path.join(__dirname, '../../config-app/dist');
+const configAppDist = fs.existsSync(prodConfigPath) ? prodConfigPath : devConfigPath;
 app.use('/config', express.static(configAppDist));
 app.get('/config/*', (req, res) => {
   res.sendFile(path.join(configAppDist, 'index.html'));
