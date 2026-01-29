@@ -509,7 +509,35 @@ export default function CoverLetterModal({
                       </Button>
                       <Button
                         size="sm"
-                        onClick={() => setEditMode(false)}
+                        onClick={async () => {
+                          // Save edited content to the active version
+                          const trimmed = editedContent.trim();
+                          if (activeVersion === 'short') {
+                            setShortVersion(trimmed);
+                          } else {
+                            setLongVersion(trimmed);
+                          }
+
+                          // Save to database
+                          if (resumeData?.id) {
+                            try {
+                              const updateData = activeVersion === 'short'
+                                ? { cover_letter_short: trimmed }
+                                : { cover_letter_long: trimmed };
+                              await api.entities.ResumeData.update(resumeData.id, updateData);
+
+                              if (onCoverLetterSaved) {
+                                onCoverLetterSaved(updateData);
+                              }
+                            } catch (err) {
+                              console.error("Failed to save cover letter edit:", err);
+                              setNotification({ open: true, title: "Error", message: "Failed to save changes.", type: "error" });
+                            }
+                          }
+
+                          setEditMode(false);
+                          setEditedContent("");
+                        }}
                         className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                       >
                         <Save className="w-4 h-4 mr-1" />
@@ -540,13 +568,14 @@ export default function CoverLetterModal({
                       >
                         <Button
                           variant="outline"
+                          size="sm"
                           onClick={() => {
                             setEditedContent(getCurrentContent());
                             setEditMode(true);
                           }}
-                          className="absolute top-6 right-6 z-20 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 shadow-lg text-slate-900 dark:text-slate-100"
+                          className="absolute top-3 right-3 z-20 bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 shadow-md text-slate-700 dark:text-slate-200 backdrop-blur-sm"
                         >
-                          <Edit2 className="w-4 h-4 mr-2" />
+                          <Edit2 className="w-3.5 h-3.5 mr-1.5" />
                           Edit Content
                         </Button>
                         <CoverLetterTemplate 

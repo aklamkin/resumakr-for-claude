@@ -219,13 +219,6 @@ export default function DesignWithAIModal({
                 })}
               </div>
 
-              <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg p-3 mb-6">
-                <p className="text-xs text-blue-200 leading-relaxed">
-                  <strong className="text-blue-100">Note:</strong> Cover letter generated from your resume and job description. 
-                  No information is fabricated.
-                </p>
-              </div>
-
               {/* Color Customization */}
               <div className="mb-6">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">

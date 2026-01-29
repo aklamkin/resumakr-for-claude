@@ -678,11 +678,11 @@ export default function ResumeReview() {
                     ? "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100"
                     : "bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400"
                 }`}
-                title={!isPaid ? "Premium feature - Upgrade to edit data" : "Edit resume data"}
+                title={!isPaid ? "Premium feature - Upgrade to edit content" : "Edit resume content"}
               >
                 {!isPaid && <Lock className="w-3 h-3 mr-1.5" />}
                 <Edit2 className="w-4 h-4 mr-2" />
-                Edit Data
+                Edit Content
                 {!isPaid && <Crown className="w-3 h-3 ml-1.5 text-amber-500" />}
               </Button>
             ) : (
@@ -743,7 +743,7 @@ export default function ResumeReview() {
           className="relative">
 
           <Card id="resume-card" className="p-12 border-2 shadow-lg bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-            {/* Edit Data / Save & Cancel buttons */}
+            {/* Edit Content / Save & Cancel buttons */}
             <div
               id="edit-button-container"
               className="absolute top-6 right-6"
@@ -767,11 +767,11 @@ export default function ResumeReview() {
                       ? "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100"
                       : "bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400"
                   }`}
-                  title={!isPaid ? "Premium feature - Upgrade to edit data" : "Edit resume data"}
+                  title={!isPaid ? "Premium feature - Upgrade to edit content" : "Edit resume content"}
                 >
                   {!isPaid && <Lock className="w-3 h-3 mr-1.5" />}
                   <Edit2 className="w-4 h-4 mr-2" />
-                  Edit Data
+                  Edit Content
                   {!isPaid && <Crown className="w-3 h-3 ml-1.5 text-amber-500" />}
                 </Button>
               ) : (

@@ -274,31 +274,23 @@ Content:
 
   cover_letter_short: {
     name: 'Cover Letter (Short)',
-    description: 'Generates a concise cover letter (3-4 paragraphs, 250-300 words). Used in the cover letter modal.',
-    system_prompt: 'You are a professional cover letter writer.',
-    prompt_text: `You are a professional cover letter writer. Create a compelling cover letter based on the candidate's resume and the job description provided.
+    description: 'Generates a concise cover letter (2-3 paragraphs, 150-200 words). Used in the cover letter modal.',
+    system_prompt: 'You are a professional cover letter writer. You write concise, complete cover letters. You ALWAYS finish every sentence you start.',
+    prompt_text: `Write a SHORT cover letter body based on the candidate's resume and job description.
 
-CRITICAL INSTRUCTIONS:
-1. NEVER make up information or hallucinate details
-2. Only use information explicitly provided in the resume
-3. Be professional, enthusiastic, and concise
-4. Address how the candidate's actual experience matches the job requirements
-5. Do NOT include salutation, date, or closing - ONLY the body paragraphs
-6. Start directly with the first paragraph
+CRITICAL RULES:
+1. NEVER make up information - only use what's in the resume
+2. Do NOT include salutation ("Dear..."), date, or closing ("Sincerely") - ONLY body paragraphs
+3. MUST complete every sentence fully - never end mid-sentence
+4. Keep it SHORT: exactly 2-3 paragraphs, 150-200 words total
+5. Each paragraph should be 2-3 sentences maximum
 
 Resume Information:
 {resume_summary}
 
 {job_description_section}
 
-Write a concise, impactful cover letter that:
-- Highlights the candidate's relevant experience and skills
-- Shows enthusiasm for the position
-- Explains why they're a good fit
-- Maintains a professional tone
-- Keep it to 3-4 short paragraphs (250-300 words maximum)
-
-Return ONLY the body paragraphs, no salutation, no date, no closing signature.`,
+Write 2-3 brief paragraphs (150-200 words) highlighting relevant experience and fit for the role. Be direct and concise. Complete all sentences.`,
     temperature: 0.7,
     max_tokens: 2000,
     available_variables: [
@@ -310,31 +302,31 @@ Return ONLY the body paragraphs, no salutation, no date, no closing signature.`,
 
   cover_letter_long: {
     name: 'Cover Letter (Long)',
-    description: 'Generates a detailed cover letter (4-5 paragraphs, 400-500 words). Used in the cover letter modal.',
-    system_prompt: 'You are a professional cover letter writer.',
-    prompt_text: `You are a professional cover letter writer. Create a compelling cover letter based on the candidate's resume and the job description provided.
+    description: 'Generates a detailed cover letter (5-6 paragraphs, 450-600 words). Used in the cover letter modal.',
+    system_prompt: 'You are a professional cover letter writer. You write thorough, detailed cover letters. You ALWAYS finish every sentence you start.',
+    prompt_text: `Write a DETAILED cover letter body based on the candidate's resume and job description.
 
-CRITICAL INSTRUCTIONS:
-1. NEVER make up information or hallucinate details
-2. Only use information explicitly provided in the resume
-3. Be professional, enthusiastic, and concise
-4. Address how the candidate's actual experience matches the job requirements
-5. Do NOT include salutation, date, or closing - ONLY the body paragraphs
-6. Start directly with the first paragraph
+CRITICAL RULES:
+1. NEVER make up information - only use what's in the resume
+2. Do NOT include salutation ("Dear..."), date, or closing ("Sincerely") - ONLY body paragraphs
+3. MUST complete every sentence fully - never end mid-sentence
+4. Make it DETAILED: exactly 5-6 paragraphs, 450-600 words total
+5. Each paragraph should be 4-6 sentences
 
 Resume Information:
 {resume_summary}
 
 {job_description_section}
 
-Write a detailed, comprehensive cover letter that:
-- Highlights the candidate's relevant experience and skills
-- Shows enthusiasm for the position
-- Explains why they're a good fit
-- Maintains a professional tone
-- Provide more detail about experiences and skills, 4-5 paragraphs (400-500 words)
+Structure your 5-6 paragraphs as follows:
+- Paragraph 1: Strong opening connecting candidate to the specific role
+- Paragraph 2: Most relevant professional experience with specific accomplishments
+- Paragraph 3: Technical skills and expertise that match the job requirements
+- Paragraph 4: Leadership, collaboration, or other soft skills demonstrated through experience
+- Paragraph 5: Additional qualifications, certifications, or education relevance
+- Paragraph 6: Closing paragraph expressing enthusiasm and fit
 
-Return ONLY the body paragraphs, no salutation, no date, no closing signature.`,
+Write 450-600 words total. Be specific about experience and achievements. Complete all sentences.`,
     temperature: 0.7,
     max_tokens: 2000,
     available_variables: [
