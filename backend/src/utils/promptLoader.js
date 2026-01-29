@@ -275,24 +275,23 @@ Content:
   cover_letter_short: {
     name: 'Cover Letter (Short)',
     description: 'Generates a concise cover letter (2-3 paragraphs, 150-200 words). Used in the cover letter modal.',
-    system_prompt: 'You are a professional cover letter writer. You write concise, complete cover letters. You ALWAYS finish every sentence you start.',
-    prompt_text: `Write a SHORT cover letter body based on the candidate's resume and job description.
+    system_prompt: 'You are a professional cover letter writer. You output ONLY plain text prose paragraphs. Never use markdown, asterisks, bold, bullet points, or any formatting. Never include salutations or closings.',
+    prompt_text: `Write a SHORT cover letter body (ONLY the body paragraphs) for this candidate.
 
-CRITICAL RULES:
-1. NEVER make up information - only use what's in the resume
-2. Do NOT include salutation ("Dear..."), date, or closing ("Sincerely") - ONLY body paragraphs
-3. MUST complete every sentence fully - never end mid-sentence
-4. Keep it SHORT: exactly 2-3 paragraphs, 150-200 words total
-5. Each paragraph should be 2-3 sentences maximum
+OUTPUT FORMAT: Plain text only. No markdown. No bold. No asterisks. No bullet points. No "Dear..." or "Sincerely". Just 2-3 plain prose paragraphs separated by blank lines.
 
-Resume Information:
+LENGTH: 150-200 words total. 2-3 paragraphs. Each paragraph 2-3 sentences.
+
+RULES: Only use facts from the resume below. Complete every sentence. No fabricated information.
+
+Resume:
 {resume_summary}
 
 {job_description_section}
 
-Write 2-3 brief paragraphs (150-200 words) highlighting relevant experience and fit for the role. Be direct and concise. Complete all sentences.`,
+Now write 2-3 concise plain text paragraphs (150-200 words) connecting this candidate's experience to the role:`,
     temperature: 0.7,
-    max_tokens: 2000,
+    max_tokens: 4000,
     available_variables: [
       { name: 'resume_summary', description: 'Formatted resume summary with name, experience, skills, education' },
       { name: 'job_description', description: 'The target job description' },
@@ -303,32 +302,23 @@ Write 2-3 brief paragraphs (150-200 words) highlighting relevant experience and 
   cover_letter_long: {
     name: 'Cover Letter (Long)',
     description: 'Generates a detailed cover letter (5-6 paragraphs, 450-600 words). Used in the cover letter modal.',
-    system_prompt: 'You are a professional cover letter writer. You write thorough, detailed cover letters. You ALWAYS finish every sentence you start.',
-    prompt_text: `Write a DETAILED cover letter body based on the candidate's resume and job description.
+    system_prompt: 'You are a professional cover letter writer. You output ONLY plain text prose paragraphs. Never use markdown, asterisks, bold, bullet points, or any formatting. Never include salutations or closings. Never output outlines or plans.',
+    prompt_text: `Write a DETAILED cover letter body (ONLY the body paragraphs) for this candidate.
 
-CRITICAL RULES:
-1. NEVER make up information - only use what's in the resume
-2. Do NOT include salutation ("Dear..."), date, or closing ("Sincerely") - ONLY body paragraphs
-3. MUST complete every sentence fully - never end mid-sentence
-4. Make it DETAILED: exactly 5-6 paragraphs, 450-600 words total
-5. Each paragraph should be 4-6 sentences
+OUTPUT FORMAT: Plain text only. No markdown. No bold. No asterisks. No bullet points. No headings. No labels like "Paragraph 1:". No outlines or plans. No "Dear..." or "Sincerely". Just 5-6 plain prose paragraphs separated by blank lines.
 
-Resume Information:
+LENGTH: 450-600 words total. 5-6 paragraphs. Each paragraph 4-6 sentences. This must be MUCH longer than a short cover letter.
+
+RULES: Only use facts from the resume below. Complete every sentence. No fabricated information.
+
+Resume:
 {resume_summary}
 
 {job_description_section}
 
-Structure your 5-6 paragraphs as follows:
-- Paragraph 1: Strong opening connecting candidate to the specific role
-- Paragraph 2: Most relevant professional experience with specific accomplishments
-- Paragraph 3: Technical skills and expertise that match the job requirements
-- Paragraph 4: Leadership, collaboration, or other soft skills demonstrated through experience
-- Paragraph 5: Additional qualifications, certifications, or education relevance
-- Paragraph 6: Closing paragraph expressing enthusiasm and fit
-
-Write 450-600 words total. Be specific about experience and achievements. Complete all sentences.`,
+Now write 5-6 detailed plain text paragraphs (450-600 words). Cover: why this candidate fits the role, their key professional achievements, relevant technical skills, leadership qualities, and enthusiasm for the opportunity:`,
     temperature: 0.7,
-    max_tokens: 2000,
+    max_tokens: 4000,
     available_variables: [
       { name: 'resume_summary', description: 'Formatted resume summary with name, experience, skills, education' },
       { name: 'job_description', description: 'The target job description' },

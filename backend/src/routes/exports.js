@@ -5,7 +5,7 @@
 
 import express from 'express';
 import { authenticate } from '../middleware/auth.js';
-import { getMonthlyUsage, incrementPdfDownload, hasExceededPdfLimit } from '../utils/usageTracking.js';
+import { getPdfUsage, incrementPdfDownload, hasExceededPdfLimit } from '../utils/usageTracking.js';
 
 const router = express.Router();
 router.use(authenticate);
@@ -31,23 +31,21 @@ router.get('/pdf-status', async (req, res) => {
       });
     }
 
-    // Free users have limited downloads
-    const usage = await getMonthlyUsage(req.user.id);
+    // Free users have limited downloads (synchronous — reads from req.user)
     const limit = limits.pdfDownloadsPerMonth;
-    const used = usage.pdf_downloads || 0;
-    const remaining = Math.max(0, limit - used);
+    const pdfUsage = getPdfUsage(req.user, limit);
 
     res.json({
-      canDownload: remaining > 0,
+      canDownload: pdfUsage.remaining > 0,
       tier: 'free',
       watermark: limits.watermarkPdf,
-      limit,
-      used,
-      remaining,
-      message: remaining <= 0
+      limit: pdfUsage.limit,
+      used: pdfUsage.used,
+      remaining: pdfUsage.remaining,
+      message: pdfUsage.remaining <= 0
         ? 'You have reached your monthly PDF download limit. Upgrade for unlimited downloads.'
         : null,
-      upgradeUrl: remaining <= 0 ? '/pricing' : null
+      upgradeUrl: pdfUsage.remaining <= 0 ? '/pricing' : null
     });
   } catch (error) {
     console.error('PDF status error:', error);
@@ -73,9 +71,8 @@ router.post('/pdf-download', async (req, res) => {
       });
     }
 
-    // Check if free user has exceeded limit
-    const exceeded = await hasExceededPdfLimit(req.user.id, limits.pdfDownloadsPerMonth);
-    if (exceeded) {
+    // Check if free user has exceeded limit (synchronous — reads from req.user)
+    if (hasExceededPdfLimit(req.user, limits.pdfDownloadsPerMonth)) {
       return res.status(403).json({
         error: 'Download limit exceeded',
         message: 'You have reached your monthly PDF download limit. Upgrade for unlimited downloads.',
@@ -84,11 +81,10 @@ router.post('/pdf-download', async (req, res) => {
       });
     }
 
-    // Record the download
-    const usage = await incrementPdfDownload(req.user.id);
+    // Record the download (async — updates users table)
+    const used = await incrementPdfDownload(req.user.id);
 
     const limit = limits.pdfDownloadsPerMonth;
-    const used = usage.pdf_downloads || 0;
     const remaining = Math.max(0, limit - used);
 
     res.json({

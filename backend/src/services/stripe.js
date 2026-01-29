@@ -482,7 +482,6 @@ export async function handleCheckoutSessionCompleted(session) {
             subscription_end_date = $2,
             subscription_started_at = NOW(),
             user_tier = 'paid',
-            ai_credits_total = 999999,
             tier_updated_at = NOW(),
             updated_at = NOW()
           WHERE id = $3
@@ -610,7 +609,6 @@ export async function handleSubscriptionCreated(subscription) {
       subscription_end_date = $2,
       subscription_started_at = NOW(),
       user_tier = 'paid',
-      ai_credits_total = 999999,
       tier_updated_at = NOW(),
       updated_at = NOW()
     WHERE id = $3`,
@@ -702,7 +700,7 @@ export async function handleSubscriptionDeleted(subscription) {
     [userId]
   );
 
-  console.log(`Subscription deleted for user ${userId}`);
+  console.log(`Subscription deleted for user ${userId}, tier reset to free`);
 }
 
 /**

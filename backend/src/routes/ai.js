@@ -57,21 +57,22 @@ function closeTruncatedJSON(jsonString) {
 // NOTE: requireSubscription removed - freemium users can access AI with credit limits
 
 /**
- * Middleware to check AI credits for free users (account-level, not per-resume)
+ * Middleware to check monthly AI credits for free users.
+ * Reads synchronously from req.user (populated by auth middleware).
  */
-async function checkAiCredits(req, res, next) {
+function checkAiCredits(req, res, next) {
   // Paid users have unlimited credits
   if (req.user.effectiveTier === 'paid') {
     return next();
   }
 
-  // Check account-level credits
-  const credits = await getUserAiCredits(req.user.id);
+  // Check monthly credits (synchronous — reads from req.user)
+  const credits = getUserAiCredits(req.user);
 
   if (credits.remaining <= 0) {
     return res.status(403).json({
       error: 'AI credits exhausted',
-      message: `You've used all ${credits.total} AI credits on your free account. Upgrade for unlimited AI assistance.`,
+      message: `You've used all ${credits.total} AI credits this month. Upgrade for unlimited AI assistance.`,
       creditsUsed: credits.used,
       creditsTotal: credits.total,
       creditsRemaining: 0,
@@ -318,10 +319,10 @@ router.post('/improve-summary', checkAiCredits, async (req, res) => {
     });
     const prompt = promptData.userPrompt;
     const providers = await getActiveProviders();
-    const results = [];
-    for (const provider of providers) {
-      try {
-        // Use callAI helper which supports both OpenAI and Gemini providers
+
+    // Call all providers in parallel for faster response
+    const settled = await Promise.allSettled(
+      providers.map(async (provider) => {
         const aiClientWrapper = getAIClient(provider);
         const systemPrompt = promptData.systemPrompt;
         const modelToUse = provider.model_name || 'gpt-4o-mini';
@@ -329,13 +330,20 @@ router.post('/improve-summary', checkAiCredits, async (req, res) => {
           temperature: promptData.temperature ?? 0.7,
           max_tokens: promptData.max_tokens ?? 500
         });
-        results.push({
+        return {
           provider_id: provider.id,
           provider_name: provider.name,
           improved_text: aiResponse.content.trim()
-        });
-      } catch (error) {
-        console.error(`Provider ${provider.name} failed:`, error);
+        };
+      })
+    );
+
+    const results = [];
+    for (const outcome of settled) {
+      if (outcome.status === 'fulfilled') {
+        results.push(outcome.value);
+      } else {
+        console.error('Provider failed:', outcome.reason);
       }
     }
 

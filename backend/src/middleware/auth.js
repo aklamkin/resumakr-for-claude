@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { query } from '../config/database.js';
 import { getUserTier, getTierLimits } from '../utils/tierLimits.js';
+import { ensureCurrentPeriod } from '../utils/usageTracking.js';
 
 export const authenticate = async (req, res, next) => {
   try {
@@ -12,7 +13,7 @@ export const authenticate = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const result = await query(
       `SELECT id, email, full_name, role, is_subscribed, subscription_plan, subscription_end_date,
-              user_tier, ai_credits_total, ai_credits_used
+              user_tier, usage_period, ai_credits_used_this_period, pdf_downloads_this_period
        FROM users WHERE id = $1`,
       [decoded.userId]
     );
@@ -24,6 +25,9 @@ export const authenticate = async (req, res, next) => {
     // Calculate effective tier based on subscription status
     user.effectiveTier = getUserTier(user);
     user.tierLimits = getTierLimits(user.effectiveTier);
+
+    // Ensure usage period is current (lazy reset on month rollover)
+    await ensureCurrentPeriod(user);
 
     req.user = user;
     next();
@@ -65,7 +69,7 @@ export const optionalAuth = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const result = await query(
       `SELECT id, email, full_name, role, is_subscribed, subscription_end_date,
-              user_tier, ai_credits_total, ai_credits_used
+              user_tier, usage_period, ai_credits_used_this_period, pdf_downloads_this_period
        FROM users WHERE id = $1`,
       [decoded.userId]
     );
@@ -73,6 +77,7 @@ export const optionalAuth = async (req, res, next) => {
       const user = result.rows[0];
       user.effectiveTier = getUserTier(user);
       user.tierLimits = getTierLimits(user.effectiveTier);
+      await ensureCurrentPeriod(user);
       req.user = user;
     } else {
       req.user = null;

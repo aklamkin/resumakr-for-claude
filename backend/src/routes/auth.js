@@ -10,6 +10,7 @@ import { validate } from '../middleware/validate.js';
 import { registerSchema, loginSchema, changePasswordSchema, updateProfileSchema, forgotPasswordSchema, resetPasswordSchema } from '../validators/schemas.js';
 import { log } from '../utils/logger.js';
 import { sendPasswordResetEmail } from '../services/email.js';
+import { getUserAiCredits, ensureCurrentPeriod } from '../utils/usageTracking.js';
 
 const router = express.Router();
 
@@ -32,14 +33,17 @@ router.post('/register', validate(registerSchema), async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const result = await query(
-      `INSERT INTO users (email, password, full_name, role, is_subscribed, user_tier, ai_credits_total, ai_credits_used, tier_updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-       RETURNING id, email, full_name, role, is_subscribed, user_tier, ai_credits_total, ai_credits_used, created_at`,
-      [email, hashedPassword, full_name, 'user', false, 'free', 5, 0]
+      `INSERT INTO users (email, password, full_name, role, is_subscribed, user_tier, tier_updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())
+       RETURNING id, email, full_name, role, is_subscribed, user_tier, created_at`,
+      [email, hashedPassword, full_name, 'user', false, 'free']
     );
 
     const user = result.rows[0];
     const token = jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
+
+    // Get monthly AI credits (new user = 0 used)
+    const aiCredits = getUserAiCredits({ effectiveTier: 'free', ai_credits_used_this_period: 0 });
 
     log.auth('Registration successful', { userId: user.id, email, requestId: req.requestId });
     res.status(201).json({
@@ -50,11 +54,7 @@ router.post('/register', validate(registerSchema), async (req, res) => {
         role: user.role,
         is_subscribed: user.is_subscribed,
         tier: 'free',
-        aiCredits: {
-          total: 5,
-          used: 0,
-          remaining: 5
-        }
+        aiCredits
       },
       token
     });
@@ -98,6 +98,13 @@ router.post('/login', validate(loginSchema), async (req, res) => {
     const { getUserTier, getTierLimits } = await import('../utils/tierLimits.js');
     const effectiveTier = getUserTier(user);
     const tierLimits = getTierLimits(effectiveTier);
+    user.effectiveTier = effectiveTier;
+
+    // Ensure usage period is current (lazy reset)
+    await ensureCurrentPeriod(user);
+
+    // Get monthly AI credits (synchronous — reads from user object)
+    const aiCredits = getUserAiCredits(user);
 
     log.auth('Login successful', { userId: user.id, email, requestId: req.requestId });
     res.json({
@@ -111,11 +118,7 @@ router.post('/login', validate(loginSchema), async (req, res) => {
         subscription_end_date: user.subscription_end_date,
         tier: effectiveTier,
         tierLimits: tierLimits,
-        aiCredits: {
-          total: user.ai_credits_total || 5,
-          used: user.ai_credits_used || 0,
-          remaining: Math.max(0, (user.ai_credits_total || 5) - (user.ai_credits_used || 0))
-        }
+        aiCredits
       },
       token
     });
@@ -126,6 +129,9 @@ router.post('/login', validate(loginSchema), async (req, res) => {
 });
 
 router.get('/me', authenticate, async (req, res) => {
+  // Get monthly AI credits (synchronous — reads from req.user set by auth middleware)
+  const aiCredits = getUserAiCredits(req.user);
+
   res.json({
     id: req.user.id,
     email: req.user.email,
@@ -137,11 +143,7 @@ router.get('/me', authenticate, async (req, res) => {
     // Freemium tier info
     tier: req.user.effectiveTier,
     tierLimits: req.user.tierLimits,
-    aiCredits: {
-      total: req.user.ai_credits_total || 5,
-      used: req.user.ai_credits_used || 0,
-      remaining: Math.max(0, (req.user.ai_credits_total || 5) - (req.user.ai_credits_used || 0))
-    }
+    aiCredits
   });
 });
 

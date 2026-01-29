@@ -2,14 +2,14 @@
  * Tier Limits Configuration
  * Defines feature limits for free and paid tiers
  *
- * IMPORTANT: AI credits are per ACCOUNT (not per resume),
- * given once at signup, and never reset monthly.
+ * AI credits and PDF downloads both reset monthly.
+ * Free users get 5 of each per calendar month.
  */
 
 // Tier configuration (can later be moved to database)
 export const TIER_LIMITS = {
   free: {
-    aiCreditsTotal: 5,           // 5 credits TOTAL per account (lifetime, not monthly)
+    aiCreditsPerMonth: 5,        // 5 AI credits per month
     pdfDownloadsPerMonth: 5,     // 5 downloads per month for free users
     maxResumesPerDay: 10,        // Increased from 3 for testing
     premiumTemplates: false,
@@ -22,7 +22,7 @@ export const TIER_LIMITS = {
     freeTemplateIds: ['classic-professional', 'modern-minimalist', 'creative-bold', 'executive-elegant', 'tech-sleek']
   },
   paid: {
-    aiCreditsTotal: Infinity,    // Unlimited for paid users
+    aiCreditsPerMonth: Infinity,  // Unlimited for paid users
     pdfDownloadsPerMonth: Infinity,
     maxResumesPerDay: Infinity,
     premiumTemplates: true,
@@ -63,28 +63,21 @@ export function getTierLimits(tier) {
 }
 
 /**
- * Check if user has AI credits remaining (for free users)
- * Paid users always return true (unlimited)
- * @param {Object} user - User object
- * @returns {boolean}
+ * @deprecated Use getUserAiCredits() from usageTracking.js instead.
+ * AI credits are now tracked monthly in user_monthly_usage table.
+ * This synchronous helper only checks tier — for actual credit counts,
+ * use the async getUserAiCredits(userId, tier) function.
  */
 export function hasAiCreditsRemaining(user) {
-  if (getUserTier(user) === 'paid') return true;
-  const used = user.ai_credits_used || 0;
-  const total = user.ai_credits_total || 5;
-  return used < total;
+  return getUserTier(user) === 'paid';
 }
 
 /**
- * Get remaining AI credits for user
- * @param {Object} user - User object
- * @returns {number} Remaining credits (Infinity for paid users)
+ * @deprecated Use getUserAiCredits() from usageTracking.js instead.
  */
 export function getRemainingAiCredits(user) {
   if (getUserTier(user) === 'paid') return Infinity;
-  const used = user.ai_credits_used || 0;
-  const total = user.ai_credits_total || 5;
-  return Math.max(0, total - used);
+  return 0; // Must use async getUserAiCredits() for actual count
 }
 
 /**

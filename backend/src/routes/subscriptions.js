@@ -1,7 +1,7 @@
 import express from 'express';
 import { query } from '../config/database.js';
 import { authenticate } from '../middleware/auth.js';
-import { getMonthlyUsage, getResumesCreatedLast24Hours, getUserAiCredits } from '../utils/usageTracking.js';
+import { getResumesCreatedLast24Hours, getUserAiCredits, getPdfUsage } from '../utils/usageTracking.js';
 
 const router = express.Router();
 
@@ -30,23 +30,23 @@ router.get('/my-tier', authenticate, async (req, res) => {
     const tier = req.user.effectiveTier;
     const limits = req.user.tierLimits;
 
-    // Get monthly usage
-    const monthlyUsage = await getMonthlyUsage(req.user.id);
+    // Get PDF usage (synchronous — reads from req.user)
+    const pdfUsage = getPdfUsage(req.user, limits.pdfDownloadsPerMonth);
 
     // Get resume creation count in last 24 hours
     const resumesCreatedToday = await getResumesCreatedLast24Hours(req.user.id);
 
-    // Get AI credits
-    const aiCredits = await getUserAiCredits(req.user.id);
+    // Get monthly AI credits (synchronous — reads from req.user)
+    const aiCredits = getUserAiCredits(req.user);
 
     res.json({
       tier,
       limits,
       usage: {
         pdfDownloads: {
-          used: monthlyUsage.pdf_downloads || 0,
-          limit: limits.pdfDownloadsPerMonth,
-          remaining: tier === 'paid' ? null : Math.max(0, limits.pdfDownloadsPerMonth - (monthlyUsage.pdf_downloads || 0))
+          used: pdfUsage.used,
+          limit: pdfUsage.limit,
+          remaining: pdfUsage.remaining
         },
         resumesCreatedToday,
         maxResumesPerDay: limits.maxResumesPerDay,

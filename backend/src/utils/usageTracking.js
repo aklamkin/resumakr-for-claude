@@ -1,15 +1,19 @@
 /**
  * Usage Tracking Utilities
- * Tracks PDF downloads, resume creation, and AI credit usage
+ * Tracks PDF downloads, resume creation, and AI credit usage.
  *
- * IMPORTANT: AI credits are per ACCOUNT (lifetime), not per resume or monthly.
- * Free users get 5 credits at signup that never reset.
+ * All monthly counters (AI credits, PDF downloads) live on the users table
+ * with a usage_period (YYYY-MM) column. When the month rolls over, the auth
+ * middleware resets counters to 0 — no cron job, no separate table needed.
  */
 
 import { query } from '../config/database.js';
 
+const AI_CREDITS_PER_MONTH = 5;
+const PDF_DOWNLOADS_PER_MONTH = 5;
+
 // ============================================
-// MONTHLY USAGE (PDF downloads only)
+// PERIOD MANAGEMENT
 // ============================================
 
 /**
@@ -22,52 +26,128 @@ export function getCurrentYearMonth() {
 }
 
 /**
- * Get or create monthly usage record for a user
- * @param {string} userId - User UUID
- * @returns {Object} Monthly usage record
+ * Ensure the user's usage_period matches the current month.
+ * If stale or null, reset counters to 0. Called by auth middleware.
+ * Mutates the user object in-place for the current request.
+ * @param {Object} user - User object from DB (must have id, usage_period, etc.)
  */
-export async function getMonthlyUsage(userId) {
-  const yearMonth = getCurrentYearMonth();
+export async function ensureCurrentPeriod(user) {
+  const currentPeriod = getCurrentYearMonth();
+  if (user.usage_period === currentPeriod) return;
 
-  // Upsert pattern - create if not exists, return current values
-  const result = await query(`
-    INSERT INTO user_monthly_usage (user_id, year_month)
-    VALUES ($1, $2)
-    ON CONFLICT (user_id, year_month) DO UPDATE SET updated_at = NOW()
-    RETURNING *
-  `, [userId, yearMonth]);
+  // Period rolled over (or first request ever) — reset counters
+  await query(
+    `UPDATE users
+     SET usage_period = $2, ai_credits_used_this_period = 0, pdf_downloads_this_period = 0
+     WHERE id = $1 AND (usage_period IS NULL OR usage_period != $2)`,
+    [user.id, currentPeriod]
+  );
+  user.usage_period = currentPeriod;
+  user.ai_credits_used_this_period = 0;
+  user.pdf_downloads_this_period = 0;
+}
 
-  return result.rows[0];
+// ============================================
+// AI CREDITS (monthly, on users table)
+// ============================================
+
+/**
+ * Get user's AI credit balance from their user object (synchronous).
+ * The auth middleware ensures usage_period is current before this is called.
+ * @param {Object} user - User object with effectiveTier and usage fields
+ * @returns {{ total: number, used: number, remaining: number }}
+ */
+export function getUserAiCredits(user) {
+  if (user.effectiveTier === 'paid') {
+    return { total: 999999, used: 0, remaining: 999999 };
+  }
+  const used = user.ai_credits_used_this_period || 0;
+  return {
+    total: AI_CREDITS_PER_MONTH,
+    used,
+    remaining: Math.max(0, AI_CREDITS_PER_MONTH - used)
+  };
 }
 
 /**
- * Increment PDF download count for current month
+ * Deduct AI credit(s) and log usage.
  * @param {string} userId - User UUID
- * @returns {Object} Updated usage record
+ * @param {string|null} resumeId - Optional resume UUID
+ * @param {string} action - Action type (e.g., 'improve_summary', 'analyze_ats')
+ * @param {number} credits - Number of credits to deduct (default: 1)
+ * @returns {{ total: number, used: number, remaining: number }}
+ */
+export async function deductAiCredit(userId, resumeId, action, credits = 1) {
+  // Increment on users table
+  const result = await query(
+    `UPDATE users
+     SET ai_credits_used_this_period = COALESCE(ai_credits_used_this_period, 0) + $2
+     WHERE id = $1
+     RETURNING ai_credits_used_this_period`,
+    [userId, credits]
+  );
+
+  // Log for analytics
+  await query(
+    `INSERT INTO ai_usage_log (user_id, resume_id, action, credits_used, user_tier)
+     SELECT $1, $2, $3, $4, user_tier FROM users WHERE id = $1`,
+    [userId, resumeId, action, credits]
+  );
+
+  const used = result.rows[0]?.ai_credits_used_this_period || 0;
+  return {
+    total: AI_CREDITS_PER_MONTH,
+    used,
+    remaining: Math.max(0, AI_CREDITS_PER_MONTH - used)
+  };
+}
+
+// ============================================
+// PDF DOWNLOADS (monthly, on users table)
+// ============================================
+
+/**
+ * Get PDF download usage from user object (synchronous).
+ * @param {Object} user - User object
+ * @param {number} limit - Monthly download limit
+ * @returns {{ used: number, limit: number, remaining: number }}
+ */
+export function getPdfUsage(user, limit) {
+  if (user.effectiveTier === 'paid') {
+    return { used: 0, limit: null, remaining: null };
+  }
+  const used = user.pdf_downloads_this_period || 0;
+  return {
+    used,
+    limit,
+    remaining: Math.max(0, limit - used)
+  };
+}
+
+/**
+ * Check if user has exceeded monthly PDF download limit (synchronous).
+ * @param {Object} user - User object
+ * @param {number} limit - Monthly limit
+ * @returns {boolean}
+ */
+export function hasExceededPdfLimit(user, limit) {
+  return (user.pdf_downloads_this_period || 0) >= limit;
+}
+
+/**
+ * Increment PDF download count on users table.
+ * @param {string} userId - User UUID
+ * @returns {number} Updated download count
  */
 export async function incrementPdfDownload(userId) {
-  const yearMonth = getCurrentYearMonth();
-
-  const result = await query(`
-    INSERT INTO user_monthly_usage (user_id, year_month, pdf_downloads)
-    VALUES ($1, $2, 1)
-    ON CONFLICT (user_id, year_month)
-    DO UPDATE SET pdf_downloads = user_monthly_usage.pdf_downloads + 1, updated_at = NOW()
-    RETURNING *
-  `, [userId, yearMonth]);
-
-  return result.rows[0];
-}
-
-/**
- * Check if user has exceeded monthly PDF download limit
- * @param {string} userId - User UUID
- * @param {number} limit - Monthly limit
- * @returns {boolean} True if limit exceeded
- */
-export async function hasExceededPdfLimit(userId, limit) {
-  const usage = await getMonthlyUsage(userId);
-  return (usage.pdf_downloads || 0) >= limit;
+  const result = await query(
+    `UPDATE users
+     SET pdf_downloads_this_period = COALESCE(pdf_downloads_this_period, 0) + 1
+     WHERE id = $1
+     RETURNING pdf_downloads_this_period`,
+    [userId]
+  );
+  return result.rows[0]?.pdf_downloads_this_period || 0;
 }
 
 // ============================================
@@ -100,7 +180,6 @@ export async function canCreateResume(userId, limit) {
   const count = await getResumesCreatedLast24Hours(userId);
 
   if (count >= limit) {
-    // Find when the oldest resume in the 24hr window was created
     const oldestResult = await query(`
       SELECT created_at
       FROM resume_creation_log
@@ -137,103 +216,11 @@ export async function logResumeCreation(userId, resumeId) {
 }
 
 // ============================================
-// AI CREDITS - ACCOUNT LEVEL (NOT PER RESUME)
+// TIER MANAGEMENT
 // ============================================
 
 /**
- * Get user's AI credit balance
- * @param {string} userId - User UUID
- * @returns {Object} { total, used, remaining }
- */
-export async function getUserAiCredits(userId) {
-  const result = await query(`
-    SELECT ai_credits_total, ai_credits_used
-    FROM users
-    WHERE id = $1
-  `, [userId]);
-
-  if (!result.rows[0]) {
-    return { total: 5, used: 0, remaining: 5 };
-  }
-
-  const { ai_credits_total, ai_credits_used } = result.rows[0];
-  const total = ai_credits_total ?? 5;
-  const used = ai_credits_used ?? 0;
-
-  return {
-    total,
-    used,
-    remaining: Math.max(0, total - used)
-  };
-}
-
-/**
- * Check if user has AI credits remaining
- * @param {string} userId - User UUID
- * @returns {boolean}
- */
-export async function hasAiCreditsRemaining(userId) {
-  const credits = await getUserAiCredits(userId);
-  return credits.remaining > 0;
-}
-
-/**
- * Deduct AI credit(s) from user's account and log usage
- * @param {string} userId - User UUID
- * @param {string|null} resumeId - Optional resume UUID
- * @param {string} action - Action type (e.g., 'improve_summary', 'analyze_ats')
- * @param {number} credits - Number of credits to deduct (default: 1)
- * @returns {Object} Updated credit balance
- */
-export async function deductAiCredit(userId, resumeId, action, credits = 1) {
-  // Update user's credit balance
-  await query(`
-    UPDATE users
-    SET ai_credits_used = COALESCE(ai_credits_used, 0) + $2
-    WHERE id = $1
-  `, [userId, credits]);
-
-  // Log the usage for analytics
-  await query(`
-    INSERT INTO ai_usage_log (user_id, resume_id, action, credits_used, user_tier)
-    SELECT $1, $2, $3, $4, user_tier FROM users WHERE id = $1
-  `, [userId, resumeId, action, credits]);
-
-  // Return updated balance
-  return getUserAiCredits(userId);
-}
-
-/**
- * Grant additional AI credits to a user (for promotions, support, etc.)
- * @param {string} userId - User UUID
- * @param {number} credits - Credits to add
- * @returns {Object} Updated credit balance
- */
-export async function grantAiCredits(userId, credits) {
-  await query(`
-    UPDATE users
-    SET ai_credits_total = COALESCE(ai_credits_total, 5) + $2
-    WHERE id = $1
-  `, [userId, credits]);
-
-  return getUserAiCredits(userId);
-}
-
-/**
- * Set unlimited AI credits for paid user (on subscription activation)
- * @param {string} userId - User UUID
- */
-export async function setUnlimitedAiCredits(userId) {
-  await query(`
-    UPDATE users
-    SET ai_credits_total = 999999, ai_credits_used = 0, user_tier = 'paid'
-    WHERE id = $1
-  `, [userId]);
-}
-
-/**
- * Reset user to free tier credits (on subscription cancellation)
- * Note: We keep their used count - they don't get credits back
+ * Reset user to free tier (on subscription cancellation).
  * @param {string} userId - User UUID
  */
 export async function resetToFreeTier(userId) {
@@ -266,12 +253,10 @@ export async function checkTemplateAccess(templateId, userTier) {
 
   const template = result.rows[0];
 
-  // Paid users can access all templates
   if (userTier === 'paid') {
     return { allowed: true, template };
   }
 
-  // Free users can only access non-premium templates
   if (template.is_premium) {
     return {
       allowed: false,
