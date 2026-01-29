@@ -3,8 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAdminAuth } from './AdminAuthGuard';
 import {
   Monitor, Users, Brain, FileText, CreditCard,
-  Ticket, HelpCircle, Shield, Settings, LogOut,
-  ChevronLeft, ChevronRight, Zap
+  Ticket, HelpCircle, Shield, LogOut,
+  ChevronLeft, ChevronRight, Zap, FileCheck
 } from 'lucide-react';
 
 const navItems = [
@@ -34,19 +34,22 @@ export default function AdminLayout({ children }) {
     <div className="min-h-screen flex bg-muted/30">
       {/* Sidebar */}
       <aside className={`${collapsed ? 'w-16' : 'w-64'} bg-card border-r flex flex-col transition-all duration-200`}>
-        {/* Header */}
-        <div className="p-4 border-b flex items-center justify-between">
-          {!collapsed && (
-            <div>
-              <h1 className="font-bold text-lg bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                Resumakr
-              </h1>
-              <p className="text-xs text-muted-foreground">Admin Panel</p>
+        {/* Header - Branding */}
+        <div className="px-3 py-3 border-b flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 shadow-md flex-shrink-0">
+              <FileCheck className="h-5 w-5 text-white" />
             </div>
-          )}
+            {!collapsed && (
+              <div className="min-w-0">
+                <h1 className="text-lg font-bold tracking-tight">Resumakr</h1>
+                <p className="text-xs text-muted-foreground">Admin Panel</p>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"
+            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground flex-shrink-0"
           >
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </button>
@@ -77,9 +80,9 @@ export default function AdminLayout({ children }) {
         </nav>
 
         {/* Footer */}
-        <div className="p-3 border-t">
+        <div className="p-2 border-t">
           {!collapsed && adminUser && (
-            <div className="mb-2 px-2">
+            <div className="mb-2 px-3">
               <p className="text-sm font-medium truncate">{adminUser.full_name || adminUser.email}</p>
               <p className="text-xs text-muted-foreground truncate">{adminUser.email}</p>
             </div>
